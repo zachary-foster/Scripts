@@ -14,7 +14,7 @@ max_attempts = 5
 #Parameters
 default_error_delay = 120
 default_batch_size = 100
-
+default_comment_char = ''
 #Functions
 def log(handle, message):
 	print(message, end="",flush=True)
@@ -27,13 +27,17 @@ command_line_parser = argparse.ArgumentParser(description=program_description)
 command_line_parser.add_argument('input_file_path', metavar='ID_FILE_PATH', help='Path to a file containing a list of genbank identifiers, one per line.')
 command_line_parser.add_argument('output_file_path', metavar='OUTPUT_FILE_PATH', help='Path to where the output will be stored in genbank (.gb) format.')
 command_line_parser.add_argument('output_log_path', metavar='LOG', help='Path to the runtime log file.')
-ccommand_line_parser.add_argument('--error_delay', metavar='SECONDS', action='store', type=int, default=default_error_delay, help='Seconds to wait after a failed attempt before trying again. Default: %d' % default_error_delay)
+command_line_parser.add_argument('--error_delay', metavar='SECONDS', action='store', type=int, default=default_error_delay, help='Seconds to wait after a failed attempt before trying again. Default: %d' % default_error_delay)
 command_line_parser.add_argument('--batch_size', metavar='INTEGER', action='store', type=int, default=default_batch_size, help='Number of queries searched per submission. Default: %s' % default_batch_size)
+command_line_parser.add_argument('--comment-char', metavar='LOG', default = default_comment_char, help='Character or string that indicates a line is a comment and should be ignored. Default: none')
 arguments = command_line_parser.parse_args()
 
 #Parse input file
 with open(arguments.input_file_path, 'r') as input_file_handle:
 	ids = [line.strip() for line in input_file_handle.readlines()]
+	#remove lines with comments 
+	if arguments.comment_char != '':
+		ids = [line for line in ids if line.startswith(arguments.comment_char) == False]
 	
 #Download
 success_count = 0
