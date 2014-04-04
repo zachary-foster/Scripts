@@ -1,4 +1,7 @@
+<<<<<<< HEAD
+=======
 from Bio.Blast import NCBIWWW
+>>>>>>> da6866d6a5d644de3a1600266393828be7196781
 from Bio.Blast import NCBIXML
 from Bio import SeqIO
 
