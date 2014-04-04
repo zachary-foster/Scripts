@@ -13,9 +13,10 @@ max_attempts = 5
 
 #Parameters
 default_error_delay = 120
-default_batch_size = 500
+default_batch_size = 300
 default_start = 1
 default_end = 0
+default_comment_char = ''
 
 #Functions
 def log(handle, message):
@@ -34,6 +35,7 @@ command_line_parser.add_argument('--batch_size', metavar='INTEGER', action='stor
 command_line_parser.add_argument('--start', metavar='INTEGER', action='store', type=int, default=default_start, help='The query number at which to start processing (inclusive). Default: %s' % default_start)
 command_line_parser.add_argument('--end', metavar='INTEGER', action='store', type=int, default=default_end, help='The query number at which to stop processing (inclusive). Default: last record')
 command_line_parser.add_argument('--append', action='store_true', default=False, help='Append to output file. Default: Create or overwrite')
+command_line_parser.add_argument('--comment-char', metavar='LOG', default = default_comment_char, help='Character or string that indicates a line is a comment and should be ignored. Default: none')
 arguments = command_line_parser.parse_args()
 
 #Parse input file
@@ -73,6 +75,7 @@ with open(arguments.output_file_path, write_type) as output_file_handle:
 				try:
 					attempts += 1
 					log(log_handle, "\tAttempt %d ... " % (attempts))
+
 					#result_handle = Entrez.efetch(db="nucleotide", id=query, rettype="gb", retmode="text")
 					result_handle = Entrez.efetch(db="nucleotide", id=query, retmode="xml")
 				except KeyboardInterrupt:

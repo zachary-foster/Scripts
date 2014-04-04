@@ -4,7 +4,10 @@ import argparse
 
 #Specific Imports
 from bioinformatic_functions import *
+<<<<<<< HEAD
 from Bio.Blast import NCBIXML
+=======
+>>>>>>> da6866d6a5d644de3a1600266393828be7196781
 
 #Constants 
 program_description = 'Converts the XML output of BLAST to the m8 format: query, subject, %id, alignment length, mismatches, gap openings, query start, query end, subject start, subject end, E value, bit score.'
