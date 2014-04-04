@@ -17,19 +17,19 @@ default_batch_size = 100
 default_comment_char = ''
 #Functions
 def log(handle, message):
-	print(message, end="",flush=True)
+	#print(message, end="",flush=True)
 	handle.write(message)
 	handle.flush()
-	os.fsync()
+	os.fsync(handle)
 
 #Command Line Parsing 
 command_line_parser = argparse.ArgumentParser(description=program_description)
 command_line_parser.add_argument('input_file_path', metavar='ID_FILE_PATH', help='Path to a file containing a list of genbank identifiers, one per line.')
 command_line_parser.add_argument('output_file_path', metavar='OUTPUT_FILE_PATH', help='Path to where the output will be stored in genbank (.gb) format.')
-command_line_parser.add_argument('output_log_path', metavar='LOG', help='Path to the runtime log file.')
+command_line_parser.add_argument('output_log_path', metavar='OUTPUT_LOG_PATH', help='Path to the runtime log file.')
 command_line_parser.add_argument('--error_delay', metavar='SECONDS', action='store', type=int, default=default_error_delay, help='Seconds to wait after a failed attempt before trying again. Default: %d' % default_error_delay)
 command_line_parser.add_argument('--batch_size', metavar='INTEGER', action='store', type=int, default=default_batch_size, help='Number of queries searched per submission. Default: %s' % default_batch_size)
-command_line_parser.add_argument('--comment-char', metavar='LOG', default = default_comment_char, help='Character or string that indicates a line is a comment and should be ignored. Default: none')
+command_line_parser.add_argument('--comment-char', metavar='CHAR',  action='store', default = default_comment_char, help='Character or string that indicates a line is a comment and should be ignored. Default: none')
 arguments = command_line_parser.parse_args()
 
 #Parse input file
@@ -47,8 +47,8 @@ total_input_count = len(ids)
 with open(arguments.output_file_path, 'w') as output_file_handle:
 	with open(arguments.output_log_path, 'w') as log_handle:
 		while len(ids) > 0:
-			query = query_data[:arguments.batch_size]
-			del query_data[:arguments.batch_size]
+			query = ids[:arguments.batch_size]
+			del ids[:arguments.batch_size]
 			success = False
 			attempts = 0
 			log(log_handle, 'Downloading %d queries starting with "%s ..."' % (arguments.batch_size, query[0][:20]))
@@ -69,7 +69,7 @@ with open(arguments.output_file_path, 'w') as output_file_handle:
 					result = result_handle.read()
 					output_file_handle.write(result)
 					output_file_handle.flush()
-					os.fsync()
+					os.fsync(output_file_handle)
 					success = True
 					log(log_handle, "Complete\n")
 				if attempts >= max_attempts:
