@@ -8,6 +8,7 @@ import os, sys, time
 import argparse
 
 #Specific Imports
+sys.path += ['/usr/lib/python3.2/dist_packages/biopython-1.63/']
 from Bio import SeqIO
 
 #Constants 
@@ -32,8 +33,10 @@ with open(arguments.output_file_path, 'w') as output_handle:
 		gi = record.annotations['gi']
 		binomal_name = record.annotations['organism']
 		taxonomy = record.annotations['taxonomy']
+		lengths += [len(taxonomy)]
 		if len(arguments.taxa) == 0 or sum([taxon in taxonomy for taxon in arguments.taxa]) > 0:
 			fasta_header = '>' + '|'.join(taxonomy + [binomal_name, gi])
 			fasta_header = fasta_header.replace(' ', '_')
 			chars_written = output_handle.write(fasta_header + '\n')
 			chars_written = output_handle.write(sequence + '\n')
+print(set(lengths))
