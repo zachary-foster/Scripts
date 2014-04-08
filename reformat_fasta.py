@@ -64,7 +64,7 @@ for file_path in arguments.phyto_db:
 for file_path in arguments.unite:
 	for record in SeqIO.parse(file_path, 'fasta'):
 		organism, genbank_id, alternate_id, seq_type, taxonomy = record.description.split('|')
-		taxonomy = [taxon.split('__') for taxon in taxonomy.split(';')]
+		taxonomy = [(taxon[0], taxon[3:]) for taxon in taxonomy.strip(';').split(';')]
 		record = format_record_as_rdp(record, organism=organism, genbank_id=genbank_id, alternate_id=alternate_id, taxonomy=taxonomy)
 		SeqIO.write(record, arguments.output_file, 'fasta')
 
