@@ -5,6 +5,7 @@ version = change_log[-1][0]
 #Constants 
 program_description = 'Reformats the header of one or more fasta files and combines the result. ' +\
                       'The input files can be fo multiple different formats. Version %s' % (version)
+taxonomy_level_characters = ['k', 'p', 'o', 'c', 'f', 'g', 's']
 
 #Generic Imports
 import os, sys, time
@@ -45,6 +46,7 @@ command_line_parser.add_argument('--phyto-id', nargs='+', metavar='STRING', defa
 command_line_parser.add_argument('--phyto-db', nargs='+', metavar='STRING', default = [], help='Phytophthora DB format')
 command_line_parser.add_argument('--unite', nargs='+', metavar='STRING', default = [], help='RDP/UNITE format')
 command_line_parser.add_argument('--its1', nargs='+', metavar='STRING', default = [], help='ITS1 format')
+command_line_parser.add_argument('--gb2fa', nargs='+', metavar='STRING', default = [], help='genbank_to_fasta.py format')
 arguments = command_line_parser.parse_args()
 
 #Reformat Phytophthora ID files
@@ -79,5 +81,14 @@ for file_path in arguments.its1:
 		record = format_record_as_rdp(record, organism=organism, genbank_id=genbank_id)
 		write_fasta(record, arguments.output_file)
 
+#Reformat fasta taxonomy-formatted (made by genbank_to_fasta.py) files
+for file_path in arguments.gb2fa:
+	for record in SeqIO.parse(file_path, 'fasta'):
+		info = record.description.split('|')
+		genbank_id =  info.pop(-1)
+		organism = info.pop(-1)
+		taxonomy = zip(taxonomy_level_characters, info)
+		record = format_record_as_rdp(record, organism=organism, genbank_id=genbank_id, taxonomy=taxonomy)
+		write_fasta(record, arguments.output_file)
 
 
