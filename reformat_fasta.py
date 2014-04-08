@@ -33,6 +33,9 @@ def format_record_as_rdp(record, organism=None, genbank_id=None, alternate_id=No
 	record.description = ''
 	return record
 	
+def write_fasta(record, handle):
+	output = '>%s\n%s\n' % (record.id.strip(), record.seq)
+	handle.write(output)
 	
 
 #Command Line Parsing 
@@ -49,7 +52,7 @@ for file_path in arguments.phyto_id:
 	for record in SeqIO.parse(file_path, 'fasta'):
 		genbank_id, organism = record.description.split('|')
 		record = format_record_as_rdp(record, organism=organism, genbank_id=genbank_id)
-		SeqIO.write(record, arguments.output_file, 'fasta')
+		write_fasta(record, arguments.output_file)
 
 #Reformat Phytophthora DB files
 for file_path in arguments.phyto_db:
@@ -58,7 +61,7 @@ for file_path in arguments.phyto_db:
 		organism = ' '.join(record.description.split(' ')[1:])
 		organism = organism.replace('(', ' ').replace(')', ' ').strip()
 		record = format_record_as_rdp(record, organism=organism, alternate_id=alternate_id)
-		SeqIO.write(record, arguments.output_file, 'fasta')
+		write_fasta(record, arguments.output_file)
 		
 #Reformat UNITE files
 for file_path in arguments.unite:
@@ -66,7 +69,7 @@ for file_path in arguments.unite:
 		organism, genbank_id, alternate_id, seq_type, taxonomy = record.description.split('|')
 		taxonomy = [(taxon[0], taxon[3:]) for taxon in taxonomy.strip(';').split(';')]
 		record = format_record_as_rdp(record, organism=organism, genbank_id=genbank_id, alternate_id=alternate_id, taxonomy=taxonomy)
-		SeqIO.write(record, arguments.output_file, 'fasta')
+		write_fasta(record, arguments.output_file)
 
 #Reformat ITS1 files
 for file_path in arguments.its1:
@@ -74,7 +77,7 @@ for file_path in arguments.its1:
 		genbank_id, organism, taxon_id, notes = record.description.split('|')
 		genbank_id = genbank_id.split('_')[0]
 		record = format_record_as_rdp(record, organism=organism, genbank_id=genbank_id)
-		SeqIO.write(record, arguments.output_file, 'fasta')
+		write_fasta(record, arguments.output_file)
 
 
 
