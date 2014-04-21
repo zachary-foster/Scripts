@@ -23,7 +23,7 @@ command_line_parser.add_argument('input_file_path', metavar='INPUT_FILE_PATH', h
 command_line_parser.add_argument('--output', metavar='DIRECTORY_PATH',  default= None, help='A directory to store the standard output of the jobs. Default: Save in a new folder with a name derived from the input file plus "%s"' % default_output_suffix)
 command_line_parser.add_argument('--error', metavar='DIRECTORY_PATH', default = None, help='A directory to store the standard error of the jobs.Default: Save in a new folder with a name derived from the input file plus "%s"' % default_error_suffix)
 command_line_parser.add_argument('--mem_free', metavar='STRING', default =  default_free_memory, help='See qsub documentation ("man qsub"). Default: %s' % default_free_memory)
-command_line_parser.add_argument('--overwrite', metavar='BOOLEAN', action = 'store_true', default = False, help='Overwrite standard output and error files. Default: Add new files with old ones.')
+command_line_parser.add_argument('--overwrite', action = 'store_true', default = False, help='Overwrite standard output and error files. Default: Add new files with old ones.')
 arguments = command_line_parser.parse_args()
 if arguments.output == None:
 	arguments.output = arguments.input_file_path + default_output_suffix
