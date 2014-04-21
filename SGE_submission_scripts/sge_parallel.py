@@ -11,6 +11,7 @@ import argparse
 
 #Specific Imports
 from subprocess import Popen, PIPE, STDOUT
+import shutil
 
 #Parameters
 default_free_memory = '10G'
