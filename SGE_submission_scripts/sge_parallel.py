@@ -23,7 +23,7 @@ default_error_suffix = '_sge_parallel_output'
 command_line_parser = argparse.ArgumentParser(description=program_description, prefix_chars = "--")
 command_line_parser.add_argument('input_file_path', metavar='INPUT_FILE_PATH', help='Path to a file containing commands to run.')
 command_line_parser.add_argument('--output', metavar='DIRECTORY_PATH',  default= None, help='A directory to store the standard output of the jobs. Default: Save in a new folder with a name derived from the input file plus "%s"' % default_output_suffix)
-command_line_parser.add_argument('--error', action='DIRECTORY_PATH', default = None, help='A directory to store the standard error of the jobs.Default: Save in a new folder with a name derived from the input file plus "%s"' % default_error_suffix)
+command_line_parser.add_argument('--error', metavar='DIRECTORY_PATH', default = None, help='A directory to store the standard error of the jobs.Default: Save in a new folder with a name derived from the input file plus "%s"' % default_error_suffix)
 command_line_parser.add_argument('--mem_free', metavar='STRING', default =  default_free_memory, help='See qsub documentation ("man qsub"). Default: %s' % default_free_memory)
 arguments = command_line_parser.parse_args()
 if arguments.error == None:
