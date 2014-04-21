@@ -70,14 +70,17 @@ qsub_input = r"""#!/bin/bash
 #$ -V
 #$ -t 1-""" + str(input_length) + r""":1
 COMMAND=`head -n $SGE_TASK_ID """ + arguments.input_file_path + r""" | tail -1 `
+echo -n "Command: "; echo -n "Command: " >&2
 echo $COMMAND; echo $COMMAND >&2
-echo -n "Running on: "; echo -n "Running on: " >&2
+echo -n "Host: "; echo -n "Host: " >&2
 hostname; hostname >&2
-echo "SGE job id: $JOB_ID"; echo "SGE job id: $JOB_ID" >&2
+echo "SGE_job_id: $JOB_ID"; echo "SGE_job_id: $JOB_ID" >&2
+echo -n "Started: "; echo -n "Started: " >&2
 date; date >&2
 echo "========== JOB START =========="; echo "========== JOB START ==========" >&2
 $COMMAND
 echo "========== JOB STOP =========="; echo "========== JOB STOP ==========" >&2
+echo -n "Ended: "; echo -n "Ended: " >&2
 date; date >&2
 """
 
