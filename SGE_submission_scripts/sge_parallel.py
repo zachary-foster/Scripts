@@ -18,6 +18,14 @@ default_free_memory = '10G'
 default_output_suffix = '_sge_parallel_output'
 default_error_suffix = '_sge_parallel_output'
 
+#Functions
+def delete_folder_contents(path):
+	for root, dirs, files in os.walk(path):
+		for f in files:
+			os.unlink(os.path.join(root, f))
+		for d in dirs:
+			shutil.rmtree(os.path.join(root, d))
+    	
 #Command Line Parsing 
 command_line_parser = argparse.ArgumentParser(description=program_description, prefix_chars = "--")
 command_line_parser.add_argument('input_file_path', metavar='INPUT_FILE_PATH', help='Path to a file containing commands to run.')
@@ -42,14 +50,14 @@ if not os.path.exists(arguments.output):
 elif not os.path.isdir(arguments.output):
 	print "WARNING: The path to the standard output ('%s') is a file, not a directory. This can result in garbeled output." % arguments.output
 elif arguments.overwrite:
-	shutil.rmtree(arguments.output + '/*')
+	delete_folder_contents(arguments.output)
 
 if not os.path.exists(arguments.error):
 	os.makedirs(arguments.error)
 elif not os.path.isdir(arguments.error):
 	print "WARNING: The path to the standard error ('%s') is a file, not a directory. This can result in garbeled output." % arguments.error
 elif arguments.overwrite:
-	shutil.rmtree(arguments.error + '/*')
+	delete_folder_contents(arguments.error)
 	
 #Make bash submission script
 qsub_input = r"""#!/bin/bash
