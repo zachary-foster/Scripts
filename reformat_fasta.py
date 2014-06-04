@@ -6,7 +6,7 @@ version = change_log[-1][0]
 #Constants 
 program_description = 'Reformats the header of one or more fasta files to a consisntent format and combines the result. ' +\
                       'The input files can be fo multiple different formats. Version %s' % (version)
-taxonomy_level_characters = ['k', 'p', 'o', 'c', 'f', 'g', 's']
+taxonomy_level_characters = ['k', 'd', 'p', 'c', 'o', 'f', 'g', 's']
 
 #Generic Imports
 import os, sys, time
@@ -49,6 +49,7 @@ command_line_parser.add_argument('--unite', nargs='+', metavar='STRING', default
 command_line_parser.add_argument('--its1', nargs='+', metavar='STRING', default = [], help='ITS1 format')
 command_line_parser.add_argument('--gb2fa', nargs='+', metavar='STRING', default = [], help='genbank_to_fasta.py format')
 command_line_parser.add_argument('--rdp', nargs='+', metavar='STRING', default = [], help='RDP format')
+command_line_parser.add_argument('--add_org_to_tax', action='store_true', default = False, help='Add the species/genus information in the header to the taxonomy if present. Note: this might not work depending on formatting.')
 arguments = command_line_parser.parse_args()
 
 #Reformat Phytophthora ID files
@@ -106,8 +107,15 @@ for file_path in arguments.rdp:
 		new_taxonomy = []
 		for taxon, level in zip([taxonomy[i] for i in range(0,len(taxonomy), 2)], [taxonomy[i] for i in range(1,len(taxonomy), 2)]):
 			new_taxonomy.append([taxonomy_correspondance[level],taxon])
-		if len(organism.split(' ')) > 1 and organism.split(' ')[1] != 'sp.' and organism.split(' ')[0] != 'uncultured':
-			new_taxonomy.append(['s', organism.split(' ')[1]])
+		#Optionaly add organism information to taxonomy
+		if arguments.add_org_to_tax and organism.split(' ')[0].lower() not in ['uncultured', 'unknown', 'unidentified']:
+			levels_present = zip(*new_taxonomy)[0]
+			#add genus if not present
+			if 'g' not in levels_present:
+				new_taxonomy.append(['g', organism.split(' ')[0]])
+			#add species if not present
+			if 's' not in levels_present and len(organism.split(' ')) > 1:
+				new_taxonomy.append(['s', '-'.join(organism.split(' ')[1:])])
 		record = format_record(record, organism=organism, alternate_id=alternate_id, taxonomy=new_taxonomy)
 		write_fasta(record, arguments.output_file)
 
