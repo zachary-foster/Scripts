@@ -6,7 +6,8 @@ version = change_log[-1][0]
 #Constants 
 program_description = 'Reformats the header of one or more fasta files to a consisntent format and combines the result. ' +\
                       'The input files can be fo multiple different formats. Version %s' % (version)
-taxonomy_level_characters = ['k', 'd', 'p', 'c', 'o', 'f', 'g', 's']
+taxonomy_level_characters = ['k', 'd', 'p', 'c', 'sc', 'o', 'so', 'f', 'g', 's']
+ambiguous_indicators = ['uncultured', 'unknown', 'unidentified']
 
 #Generic Imports
 import os, sys, time
@@ -49,7 +50,8 @@ command_line_parser.add_argument('--unite', nargs='+', metavar='STRING', default
 command_line_parser.add_argument('--its1', nargs='+', metavar='STRING', default = [], help='ITS1 format')
 command_line_parser.add_argument('--gb2fa', nargs='+', metavar='STRING', default = [], help='genbank_to_fasta.py format')
 command_line_parser.add_argument('--rdp', nargs='+', metavar='STRING', default = [], help='RDP format')
-command_line_parser.add_argument('--add_org_to_tax', action='store_true', default = False, help='Add the species/genus information in the header to the taxonomy if present. Note: this might not work depending on formatting.')
+command_line_parser.add_argument('--add_genus_to_taxonomy', action='store_true', default = False, help='Add the genus information in the header to the taxonomy if present. Note: this might not work depending on formatting.')
+command_line_parser.add_argument('--add_species_to_taxonomy', action='store_true', default = False, help='Add the species information in the header to the taxonomy if present. Note: this might not work depending on formatting.')
 arguments = command_line_parser.parse_args()
 
 #Reformat Phytophthora ID files
@@ -84,7 +86,7 @@ for file_path in arguments.its1:
 		record = format_record(record, organism=organism, genbank_id=genbank_id)
 		write_fasta(record, arguments.output_file)
 
-#Reformat fasta taxonomy-formatted (made by genbank_to_fasta.py) files
+#Reformat fasta taxonomy-formatted (ie made by genbank_to_fasta.py) files
 for file_path in arguments.gb2fa:
 	for record in SeqIO.parse(file_path, 'fasta'):
 		info = record.description.split('|')
@@ -95,7 +97,7 @@ for file_path in arguments.gb2fa:
 		write_fasta(record, arguments.output_file)
 		
 #Reformat RDP 
-taxonomy_correspondance = {'rootrank': 'k', 'domain':'d', 'phylum':'p', 'class':'c', 'order':'o', 'family':'f', 'genus':'g'}
+taxonomy_correspondance = {'rootrank': 'k', 'domain':'d', 'phylum':'p', 'class':'c', 'subclass': 'sc', 'order':'o', 'suborder':'so', 'family':'f', 'genus':'g'}
 for file_path in arguments.rdp:
 	for record in SeqIO.parse(file_path, 'fasta'):
 		identity, taxonomy = record.description.split('\t')
@@ -108,13 +110,13 @@ for file_path in arguments.rdp:
 		for taxon, level in zip([taxonomy[i] for i in range(0,len(taxonomy), 2)], [taxonomy[i] for i in range(1,len(taxonomy), 2)]):
 			new_taxonomy.append([taxonomy_correspondance[level],taxon])
 		#Optionaly add organism information to taxonomy
-		if arguments.add_org_to_tax and organism.split(' ')[0].lower() not in ['uncultured', 'unknown', 'unidentified']:
-			levels_present = zip(*new_taxonomy)[0]
+		if arguments.add_org_to_tax and organism.split(' ')[0].lower() not in ambiguous_indicators:
+			levels_present = list(zip(*new_taxonomy))[0]
 			#add genus if not present
-			if 'g' not in levels_present:
+			if arguments.add_genus_to_taxonomy and 'g' not in levels_present:
 				new_taxonomy.append(['g', organism.split(' ')[0]])
 			#add species if not present
-			if 's' not in levels_present and len(organism.split(' ')) > 1:
+			if arguments.add_species_to_taxonomy and 's' not in levels_present and len(organism.split(' ')) > 1:
 				new_taxonomy.append(['s', '-'.join(organism.split(' ')[1:])])
 		record = format_record(record, organism=organism, alternate_id=alternate_id, taxonomy=new_taxonomy)
 		write_fasta(record, arguments.output_file)
