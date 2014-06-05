@@ -34,11 +34,11 @@ def get_taxonomy_level(taxonomy_string, level):
 command_line_parser = argparse.ArgumentParser(description=program_description, prefix_chars = "--")
 command_line_parser.add_argument('fasta', type=argparse.FileType('r'))
 command_line_parser.add_argument('taxon_data',type=argparse.FileType('r'))
-command_line_parser.add_argument('--remove_taxa', nargs='+', metavar='STRING', default = [], help='Removes all sequences that have the specified taxon in their taxonomy string in the header. Can accept multiple arguments. For example "--remove_taxa o__Helotiales g__Pythium" would remove all sequences that are of the order Helotiales and all sequences of the genus Pythium.')
-command_line_parser.add_argument('--require_taxa', nargs='+', metavar='STRING', default = [], help='Removes all sequences that do not have one of the specified taxa in their taxonomy string. Can accept multiple arguments. For example "--require_taxa p__Ascomycota g__Pythium" would remove all sequences that are not of the phylum Ascomycota or the genus Pythium.')
-command_line_parser.add_argument('--require_levels', nargs='+', metavar='STRING', default = [], help='Removes all sequences that do not have the specified taxonomic level in their taxonomy string. Can accept multiple arguments. Can accept multiple arguments. For example "--require_levels p s" would remove all sequences that do not have both a phylum and species level designation.')
-command_line_parser.add_argument('--max_count', nargs=2, metavar='INT', default = None, help='Specifies the maximum number of sequences that represent each species')
-command_line_parser.add_argument('--min_count', nargs=2, metavar='INT', default = None, help='Specifies the minimum number of sequences that represent each species. If the minimum is not present for a specific species then remove all sequences of that taxon.')
+command_line_parser.add_argument('--remove_taxa', nargs='+', default = [], help='Removes all sequences that have the specified taxon in their taxonomy string in the header. Can accept multiple arguments. For example "--remove_taxa o__Helotiales g__Pythium" would remove all sequences that are of the order Helotiales and all sequences of the genus Pythium.')
+command_line_parser.add_argument('--require_taxa', nargs='+', default = [], help='Removes all sequences that do not have one of the specified taxa in their taxonomy string. Can accept multiple arguments. For example "--require_taxa p__Ascomycota g__Pythium" would remove all sequences that are not of the phylum Ascomycota or the genus Pythium.')
+command_line_parser.add_argument('--require_levels', nargs='+', default = [], help='Removes all sequences that do not have the specified taxonomic level in their taxonomy string. Can accept multiple arguments. Can accept multiple arguments. For example "--require_levels p s" would remove all sequences that do not have both a phylum and species level designation.')
+command_line_parser.add_argument('--max_count', nargs=2, default = None, help='Specifies the maximum number of sequences that represent each species. Example: g 10')
+command_line_parser.add_argument('--min_count', nargs=2, default = None, help='Specifies the minimum number of sequences that represent each species. If the minimum is not present for a specific species then remove all sequences of that taxon. Example: g 10')
 command_line_parser.add_argument('--output_file', type=argparse.FileType('w'), default=sys.stdout)
 
 arguments = command_line_parser.parse_args()
@@ -80,7 +80,7 @@ for record in SeqIO.parse(arguments.fasta, 'fasta'):
 	keep_record = True
 	header = record.description
 	sequence = record.seq
-	alternate_id, organism, genbank_id, taxonomy_string  = header.split('|')
+	organism, genbank_id, taxonomy_string, alternate_id  = header.split('|')
 	taxonomy_elements = taxonomy_string.split(taxon_delimiter)
 	taxonomy_levels, taxonomy_names = zip(*[taxon.split('__') for taxon in taxonomy_elements])
 	taxonomy = [taxon_delimiter.join(taxonomy_elements[0:index]) for index in range(1, len(taxonomy_elements) + 1)]

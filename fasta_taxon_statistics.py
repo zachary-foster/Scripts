@@ -55,7 +55,7 @@ for record in SeqIO.parse(arguments.input, 'fasta'):
 	#parse record information
 	header = record.description
 	sequence = record.seq
-	alternate_id, organism, genbank_id, taxonomy  = header.split('|')
+	organism, genbank_id, taxonomy, alternate_id  = header.split('|')
 	
 	#get taxonomy string for each taxon
 	taxonomy_elements = taxonomy.split(taxon_delimiter)

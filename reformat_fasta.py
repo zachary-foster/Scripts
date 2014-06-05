@@ -31,7 +31,7 @@ def format_record(record, organism=None, genbank_id=None, alternate_id=None, tax
 		alternate_id = ''
 	if taxonomy == None:
 		taxonomy = {}
-	record.id = '|'.join([alternate_id, organism, genbank_id, format_taxonomy(taxonomy)])
+	record.id = '|'.join([organism, genbank_id, format_taxonomy(taxonomy), alternate_id])
 	record.id = record.id.replace(' ', '_')
 	record.description = ''
 	return record
@@ -43,15 +43,15 @@ def write_fasta(record, handle):
 
 #Command Line Parsing 
 command_line_parser = argparse.ArgumentParser(description=program_description, prefix_chars = "--")
-command_line_parser.add_argument('--output-file', nargs='?', type=argparse.FileType('w'), default=sys.stdout)
-command_line_parser.add_argument('--phyto-id', nargs='+', metavar='STRING', default = [], help='Phytophthora ID format')
-command_line_parser.add_argument('--phyto-db', nargs='+', metavar='STRING', default = [], help='Phytophthora DB format')
-command_line_parser.add_argument('--unite', nargs='+', metavar='STRING', default = [], help='UNITE format')
-command_line_parser.add_argument('--its1', nargs='+', metavar='STRING', default = [], help='ITS1 format')
-command_line_parser.add_argument('--gb2fa', nargs='+', metavar='STRING', default = [], help='genbank_to_fasta.py format')
-command_line_parser.add_argument('--rdp', nargs='+', metavar='STRING', default = [], help='RDP format')
-command_line_parser.add_argument('--add_genus_to_taxonomy', action='store_true', default = False, help='Add the genus information in the header to the taxonomy if present. Note: this might not work depending on formatting.')
-command_line_parser.add_argument('--add_species_to_taxonomy', action='store_true', default = False, help='Add the species information in the header to the taxonomy if present. Note: this might not work depending on formatting.')
+command_line_parser.add_argument('--output_file', nargs='?', type=argparse.FileType('w'), default=sys.stdout)
+command_line_parser.add_argument('--phyto_id', nargs='+', default = [], help='Phytophthora ID format')
+command_line_parser.add_argument('--phyto_db', nargs='+', default = [], help='Phytophthora DB format')
+command_line_parser.add_argument('--unite', nargs='+', default = [], help='UNITE format')
+command_line_parser.add_argument('--its1', nargs='+', default = [], help='ITS1 format')
+command_line_parser.add_argument('--gb2fa', nargs='+', default = [], help='genbank_to_fasta.py format')
+command_line_parser.add_argument('--rdp', nargs='+', default = [], help='RDP format')
+command_line_parser.add_argument('--add_genus_to_taxonomy', action='store_true', default = False, help='Add the genus information in the header to the taxonomy if present. If suggestions of ambiguity are detected, such as "uncultured", the information will not be added. Note: this might not work as expected depending on formatting.')
+command_line_parser.add_argument('--add_species_to_taxonomy', action='store_true', default = False, help='Add the species information in the header to the taxonomy if present. If suggestions of ambiguity are detected, such as "uncultured", the information will not be added. Note: this might not work as expected depending on formatting.')
 arguments = command_line_parser.parse_args()
 
 #Reformat Phytophthora ID files
@@ -110,7 +110,7 @@ for file_path in arguments.rdp:
 		for taxon, level in zip([taxonomy[i] for i in range(0,len(taxonomy), 2)], [taxonomy[i] for i in range(1,len(taxonomy), 2)]):
 			new_taxonomy.append([taxonomy_correspondance[level],taxon])
 		#Optionaly add organism information to taxonomy
-		if arguments.add_org_to_tax and organism.split(' ')[0].lower() not in ambiguous_indicators:
+		if organism.split(' ')[0].lower() not in ambiguous_indicators:
 			levels_present = list(zip(*new_taxonomy))[0]
 			#add genus if not present
 			if arguments.add_genus_to_taxonomy and 'g' not in levels_present:
