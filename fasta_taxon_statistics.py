@@ -28,8 +28,8 @@ def taxon_sort_function(a, b):
 	elif taxonomy_level_characters.index(a_level) < taxonomy_level_characters.index(b_level):
 		return -1
 	else:
-		a_dict = dict([x.split('__') for x in a.split(taxon_delimiter)])
-		b_dict = dict([x.split('__') for x in b.split(taxon_delimiter)])
+		a_dict = dict([[x.split('__')[0], '__'.join(x.split('__')[1:])] for x in a.split(taxon_delimiter)])
+		b_dict = dict([[x.split('__')[0], '__'.join(x.split('__')[1:])] for x in b.split(taxon_delimiter)])
 		for level in taxonomy_level_characters:
 			try:
 				if a_dict[level] > b_dict[level]:
