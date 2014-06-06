@@ -5,7 +5,7 @@ version = change_log[-1][0]
 #Constants 
 program_description = 'Calculates taxon-specific statistics from a FASTA file with taxonomy information in the header. Version %s' % (version)
 taxon_delimiter = ';'
-taxonomy_level_characters = ['k','d', 'p', 'c', 'o', 'f', 'g', 's']
+taxonomy_level_characters = ['k', 'd', 'p', 'c', 'sc', 'o', 'so', 'f', 'g', 's']
 
 #Generic Imports
 import os, sys, time
