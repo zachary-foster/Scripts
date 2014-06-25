@@ -5,11 +5,12 @@ taxonomy_levels = c(k='Kingdom', d='Domain', p='Phylum', c='Class', sc='Subclass
 taxonomy_separator = ';'
 
 #Parameters
-distance_matrix_file = "/home/local/USDA-ARS/fosterz/Repositories/Analysis/taxon_specific_barcode_gap/rdp_fungi_28s_1/distance_matrix_pid.txt"
-taxonomy_file = "/home/local/USDA-ARS/fosterz/Repositories/Analysis/taxon_specific_barcode_gap/rdp_fungi_28s_1/subsampled_database_taxon_statistics.txt"
-root_directory = "/home/local/USDA-ARS/fosterz/Repositories/Analysis/taxon_specific_barcode_gap/rdp_fungi_28s_1"
-level_to_analyze = 'f'
+distance_matrix_file = "/home/local/USDA-ARS/fosterz/Repositories/Analysis/taxon_specific_barcode_gap/rdp_fungi_28s_1/test_distance_matrix.txt"
+taxonomy_file = "/home/local/USDA-ARS/fosterz/Repositories/Analysis/taxon_specific_barcode_gap/rdp_fungi_28s_1/test_database_taxon_statistics.txt"
+root_directory = "/home/local/USDA-ARS/fosterz/Repositories/Analysis/taxon_specific_barcode_gap/rdp_fungi_28s_1/test"
+level_to_analyze = 'g'
 distance_type = 'PID'
+max_sequences_to_compare=100
 
 #Derived Parameters
 output_directory_name = paste(distance_type, '_', taxonomy_levels[level_to_analyze], sep='') 
@@ -38,31 +39,39 @@ taxonomy_data$level <- ordered(taxonomy_data$level, taxonomy_level_levels)
 if (!file.exists(output_directory)) {
   dir.create(output_directory, recursive=TRUE)
 }
-if (!file.exists(plot_directory)) {
-  dir.create(plot_directory, recursive=TRUE)
-}
 
 #Functions for calculating additional taxon-specific statiscs
-overall_statistics <- function(data, taxon, identity) {
-  my_mean <- mean(data, na.rm=TRUE)
-  my_sd <- sd(data, na.rm=TRUE)
-  comparison_count <- sum(!is.na(data))
-  individual_count <- nrow(data)
-  return(list(my_mean, my_sd, comparison_count, individual_count))
-}
-
-intertaxon_statistics <- function(data, taxon, identity) {
-  if (length(unique(rownames(data))) < 2) {
-    return(list(NA, NA, NA))
+overall_statistics <- function(taxon, distance, identity, ...) {
+  if (!is.matrix(distance)) {
+    return(list(distance_mean=NA, 
+                distance_sd=NA,
+                distance_count=NA,
+                subsampled_count=NA))
   }
-  inter_data <- data[!identity]
-  my_mean <- mean(inter_data, na.rm=TRUE)
-  my_sd <- sd(inter_data, na.rm=TRUE)
-  my_count <- sum(!is.na(inter_data))
-  return(list(my_mean, my_sd, my_count))
+  if (sum(!is.na(distance)) == 0) { #if there are no values besides NA
+    my_mean = NA
+  } else {
+    my_mean = mean(distance, na.rm=TRUE)
+  }
+  return(list(distance_mean=my_mean, 
+              distance_sd=sd(distance, na.rm=TRUE),
+              distance_count=sum(!is.na(distance)),
+              subsampled_count=nrow(distance)))
 }
 
-intrataxon_statistics <- function(data, taxon, identity) {
+intertaxon_statistics <- function(taxon, distance, identity, ...) {
+  if (length(unique(rownames(distance))) < 2) {
+    return(list(intertaxon_distance_mean=NA,
+                intertaxon_distance_sd=NA,
+                intertaxon_distance_count=NA))
+  }
+  inter_data <- distance[!identity]
+  return(list(intertaxon_distance_mean=mean(inter_data, na.rm=TRUE),
+              intertaxon_distance_sd=sd(inter_data, na.rm=TRUE),
+              intertaxon_distance_count=sum(!is.na(inter_data))))
+}
+
+intrataxon_statistics <- function(taxon, distance, identity) {
   if (all(is.na(unique(rownames(data))))) {
     return(list(NA, NA, NA, NA))
   }
@@ -74,7 +83,7 @@ intrataxon_statistics <- function(data, taxon, identity) {
   return(list(my_mean, my_sd, comparison_count, taxon_count))
 }
 
-distance_graph_hist <- function(data, taxon, identity) {
+distance_graph_hist <- function(taxon, distance, identity) {
   data$value <- remove_outliers(data$value)
   taxon_name <- as.character(taxonomy_data[taxon, 'name'])
   file_name <- paste(c(taxonomy_levels[as.character(taxonomy_data[taxon, 'level'])], '_', 
@@ -117,7 +126,7 @@ distance_graph_hist <- function(data, taxon, identity) {
   return(list(file_path))
 }
 
-distance_graph <- function(data, taxon, identity) {
+distance_graph <- function(taxon, distance, identity) {
   data <- melt(data, na.rm=TRUE)
   data <- cbind(data, relation=ifelse(data$Var1 == data$Var2, "Same", "Different"))
   data$value <- remove_outliers(data$value)
@@ -154,7 +163,7 @@ distance_graph <- function(data, taxon, identity) {
   return(list(file_path))
 }
 
-threshold_optimization_graph <- function(data, taxon, identity) {
+threshold_optimization_graph <- function(taxon, distance, identity) {
   min_x = 0
   max_x = quantile(data, .8, na.rm=TRUE, type=3)
   #convert lower tri matrix to full
@@ -212,45 +221,29 @@ threshold_optimization_graph <- function(data, taxon, identity) {
   return(list(file_path, optimal_threshold, optimal_false_negative, optimal_false_positive, optimal_error))
 }
 
-functions_to_apply <- list(overall_statistics = c("distance_mean", "distance_sd", "distance_count", "subsampled_count"), 
-                           intertaxon_statistics = c("intertaxon_distance_mean", "intertaxon_distance_sd", "intertaxon_distance_count"),
-                           intrataxon_statistics = c("intrataxon_distance_mean", "intrataxon_distance_sd", "intrataxon_distance_count", "subtaxon_count"),
-                           distance_graph = c("distance_graph"),
-                           threshold_optimization_graph = c("threshold_graph", "optimal_threshold", "optimal_false_negative", "optimal_false_positive", "optimal_error"))
 
-apply_functions <- function(taxon, functions, max_subset=NA, level = 'subtaxon', ...) {
-  data <- subsample_by_taxonomy(taxon, level = level, max_subset=max_subset)
-  if (!is.matrix(data)) {
-    #return all outputs as NA without using functions
-    empty_list <- lapply(unlist(functions), function(x) NA)
-    names(empty_list) <- unlist(functions)
-    return(empty_list)
-  }
-  #make true/false matrix for future filering
-  identity <-  sapply(rownames(data), function(x) colnames(data) == x)
-  output <- sapply(names(functions), function(f) get(f)(data, taxon, identity, ...))
-  #turn nested lists into a list of vectors
-  output <- unlist(recursive=F, lapply(1:length(functions), 
-                                       function(x) lapply(1:length(functions[[x]]),
-                                                          function(y) output[[x]][[y]])))
-  names(output) <- unlist(functions)
-  #close any graphics devices that did not close
-  if (length(dev.list()) > 0) {
-    for (count in 1:length(dev.list())) {dev.off()}
-  }
-  return(output)
+functions_to_apply <- list("overall_statistics",
+                           "intertaxon_statistics")
+
+get_stat_function_args <- function(data_frame_row, ...) {
+  distance <- subsample_by_taxonomy(data_frame_row$.rownames, ...)
+  identity <-  sapply(rownames(distance), function(x) colnames(distance) == x)
+  list(data_frame_row$.rownames, distance, identity)
 }
 
+taxon_statistics <- fapply(taxonomy_data, functions_to_apply,
+                           preprocessor = get_stat_function_args,
+                           preprocessor_args = list(level = level_to_analyze, 
+                                                    max_subset = max_sequences_to_compare),
+                           append=T)
+
+
+
 #apply functions to subsets of distance matrix for each taxon (CAN TAKE LONG TIME)
-raw_taxon_stats <- lapply(row.names(taxonomy_data), FUN=apply_functions, functions_to_apply, level=level_to_analyze, max_subset=1000)
-raw_taxon_stats <- ldply(raw_taxon_stats, data.frame)
-raw_taxon_stats$inter_intra_differnece <- raw_taxon_stats$intertaxon_distance_mean - raw_taxon_stats$intrataxon_distance_mean
-raw_taxon_stats$optimal_error <- (raw_taxon_stats$optimal_false_negative + raw_taxon_stats$optimal_false_positive) / raw_taxon_stats$subsampled_count
-
-
-#add calculated stats to uploaded ones
-taxonomy_data <- cbind(taxonomy_data, raw_taxon_stats)
-rm(raw_taxon_stats)
+taxon_statistics <- lapply(row.names(taxonomy_data), FUN=apply_functions, functions_to_apply, level=level_to_analyze, max_subset=1000)
+taxon_statistics <- ldply(taxon_statistics, data.frame)
+taxon_statistics$inter_intra_differnece <- taxon_statistics$intertaxon_distance_mean - taxon_statistics$intrataxon_distance_mean
+taxon_statistics$optimal_error <- (taxon_statistics$optimal_false_negative + taxon_statistics$optimal_false_positive) / taxon_statistics$subsampled_count
 
 #save statisics
-write.table(taxonomy_data, file=taxon_statistics_output_path, sep="\t", quote=FALSE, col.names=NA)
+write.table(taxon_statistics, file=taxon_statistics_output_path, sep="\t", quote=FALSE, col.names=NA)

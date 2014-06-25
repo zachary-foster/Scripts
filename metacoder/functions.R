@@ -91,11 +91,11 @@ subsample_by_taxonomy <- function(taxon, triangular=TRUE, level = 'subtaxon', ma
   if (is.na(level) | taxonomy_data[taxon, 'level'] >= level) {
     return(NA)
   }
-  indexes <- grep(taxon, distance_matrix_taxonomy, value=FALSE, fixed=TRUE)
+  indexes <- grep(taxon, distance_matrix_taxonomy, value = FALSE, fixed = TRUE)
   if (!is.na(max_subset) && length(indexes) > max_subset) {
     indexes = sample(indexes, max_subset)
   }
-  submatrix <- distance_matrix[indexes, indexes]
+  submatrix <- distance_matrix[indexes, indexes, drop = FALSE]
   names <- distance_matrix_taxonomy[indexes]
   names <- mapply(FUN=filter_taxonomy_string, names, MoreArgs=list(base_level, level))
   row.names(submatrix) <- names
@@ -105,6 +105,24 @@ subsample_by_taxonomy <- function(taxon, triangular=TRUE, level = 'subtaxon', ma
   }
   return(submatrix)
 }
+
+fapply <- function(data_frame, functions, preprocessor={function(x) x}, preprocessor_args=list(), append=FALSE, ...) {
+  apply_functions <- function(input, functions, ...) {
+    input <- append(input, list(...))
+    unlist(sapply(functions, function(f) do.call(f, input)))
+  }
+  data_frame <- name_rows(data_frame)
+  data_frame$.rownames <- factor(data_frame$.rownames, levels=data_frame$.rownames, ordered=TRUE) #preserve row order
+  output <- ddply(data_frame, ".rownames", 
+                  function(x) apply_functions(do.call(preprocessor, append(list(x), preprocessor_args)), functions, ...))
+  output <- name_rows(output)
+  if (append) {
+    data_frame <- name_rows(data_frame)
+    output <- cbind(data_frame, output)
+  }
+  return(output)
+}
+
 
 remove_outliers <- function(x, na.rm = TRUE, ...) {
   qnt <- quantile(x, probs=c(.01, .99), na.rm = na.rm, ...)
