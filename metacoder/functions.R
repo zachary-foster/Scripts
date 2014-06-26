@@ -77,16 +77,14 @@ offset_ordered_factor <- function(ordered_factor, offset) {
 fapply <- function(data_frame, functions, preprocessor={function(x) x}, preprocessor_args=list(), append=FALSE, ...) {
   apply_functions <- function(input, functions, ...) {
     input <- append(input, list(...))
-    unlist(sapply(functions, function(f) do.call(f, input)))
+    unlist(lapply(functions, function(f) do.call(f, input)), recursive=FALSE)
   }
-  data_frame <- name_rows(data_frame)
-  data_frame$.rownames <- factor(data_frame$.rownames, levels=data_frame$.rownames, ordered=TRUE) #preserve row order
-  output <- ddply(data_frame, ".rownames", 
-                  function(x) apply_functions(do.call(preprocessor, append(list(x), preprocessor_args)), functions, ...))
-  output <- name_rows(output)
+  output <- lapply(1:nrow(data_frame), function(x) apply_functions(do.call(preprocessor, append(list(data_frame[x,]), preprocessor_args)), functions, ...))
+  output <- ldply(output, data.frame)
   if (append) {
-    data_frame <- name_rows(data_frame)
     output <- cbind(data_frame, output)
+  } else {
+    row.names(output) <- row.names(data_frame)
   }
   return(output)
 }
