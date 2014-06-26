@@ -74,17 +74,31 @@ offset_ordered_factor <- function(ordered_factor, offset) {
   ordered(new_level, my_levels)
 }
 
-fapply <- function(data_frame, functions, preprocessor={function(x) x}, preprocessor_args=list(), append=FALSE, ...) {
+fapply <- function(iterable, functions, 
+                   preprocessor={function(x) x},
+                   preprocessor_args=list(),
+                   allow_complex=TRUE,
+                   ...) {
   apply_functions <- function(input, functions, ...) {
     input <- append(input, list(...))
-    unlist(lapply(functions, function(f) do.call(f, input)), recursive=FALSE)
+    results <- unlist(lapply(functions, function(f) do.call(f, input)), recursive=FALSE)
+    if (allow_complex) {
+      results <- lapply(results, function(x) if (is.recursive(x)) {I(x)} else {x})
+    } else {
+      results <- results[!sapply(results, is.recursive)]
+    }
+    return(results)
   }
-  output <- lapply(1:nrow(data_frame), function(x) apply_functions(do.call(preprocessor, append(list(data_frame[x,]), preprocessor_args)), functions, ...))
-  output <- ldply(output, data.frame)
-  if (append) {
-    output <- cbind(data_frame, output)
-  } else {
-    row.names(output) <- row.names(data_frame)
+  if (length(iterable) < 1) {
+    return(NULL)
+  }
+  output <- lapply(1:length(iterable[[1]]), function(x) apply_functions(do.call(preprocessor, append(list(iterable[x,]), preprocessor_args)), functions, ...))
+  column_names <- names(output[[1]])
+  output <- lapply(1:length(output[[1]]), function(x) lapply(output, function(row) row[[x]]))
+  output <- as.data.frame(do.call(cbind, output))
+  colnames(output) <- column_names
+  if (is.data.frame(iterable) | is.matrix(iterable)) {
+    row.names(output) <- row.names(iterable)
   }
   return(output)
 }

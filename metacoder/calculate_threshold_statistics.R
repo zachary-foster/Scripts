@@ -97,7 +97,8 @@ intrataxon_statistics <- function(taxon, distance, identity, ...) {
 
 distance_distribution <- function(taxon, distance, identity, distance_bin_width=0.001, ...) {
   if (!is.matrix(distance) | sum(!is.na(distance)) == 0) {
-    return(list(distance_distribution=NA))
+    return(list(distance_distribution_file=NA,
+                distance_distribution=NA))
   }
   #Calculate distance distribution
   breaks <- seq(as.integer(min(distance, na.rm=TRUE) / distance_bin_width),
@@ -124,12 +125,14 @@ distance_distribution <- function(taxon, distance, identity, distance_bin_width=
   }
   #write output data
   write.table(format(output, scientific = FALSE) , file=file_path, sep="\t", quote=FALSE, row.names=FALSE)
-  return(list(distance_distribution=file_path))
+  return(list(distance_distribution_file=file_path,
+              distance_distribution=output))
 }
 
 threshold_optimization <- function(taxon, distance, identity, threshold_resolution=0.001, ...) {
   if (length(unique(rownames(distance))) < 2) {
-    return(list(threshold_optimization = NA,
+    return(list(threshold_optimization_file = NA,
+                threshold_optimization = NA,
                 optimal_threshold = NA, 
                 optimal_false_negative = NA,
                 optimal_false_positive = NA,
@@ -167,7 +170,8 @@ threshold_optimization <- function(taxon, distance, identity, threshold_resoluti
 
   #write output data
   write.table(format(statistics, scientific = FALSE) , file=file_path, sep="\t", quote=FALSE, row.names=FALSE)
-  return(list(threshold_optimization = file_path,
+  return(list(threshold_optimization_file = file_path,
+              threshold_optimization = statistics,
               optimal_threshold = optimal_threshold, 
               optimal_false_negative = optimal_false_negative,
               optimal_false_positive = optimal_false_positive,
@@ -175,6 +179,8 @@ threshold_optimization <- function(taxon, distance, identity, threshold_resoluti
 }
 
 #apply functions to subsets of distance matrix for each taxon (CAN TAKE LONG TIME)
+
+calculate_threshold_statistics <- function(taxonomy_data, distance_matrix, save_statistics=TRUE
 filter_taxonomy_string <- function(taxon, min_level, max_level) {
   my_levels <- levels(taxonomy_data[taxon, 'level'])
   parsed_taxonomy <- sapply(unlist(strsplit(taxon, split=';', fixed=T)),
@@ -217,7 +223,7 @@ taxon_statistics <- fapply(taxonomy_data, functions_to_apply,
                            preprocessor = get_stat_function_args,
                            preprocessor_args = list(level = level_to_analyze, 
                                                     max_subset = max_sequences_to_compare),
-                           append = append_to_input, 
+                           allow_complex=TRUE,
                            distance_bin_width = distance_bin_width,
                            threshold_resolution = threshold_resolution)
 
