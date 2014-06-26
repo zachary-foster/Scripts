@@ -74,38 +74,6 @@ offset_ordered_factor <- function(ordered_factor, offset) {
   ordered(new_level, my_levels)
 }
 
-filter_taxonomy_string <- function(taxon, min_level, max_level) {
-  my_levels <- levels(taxonomy_data[taxon, 'level'])
-  parsed_taxonomy <- sapply(unlist(strsplit(taxon, split=';', fixed=T)),
-                            strsplit, split='__', fixed=T)
-  filter <- sapply(parsed_taxonomy, function(x) ordered(x[1], my_levels) >= min_level & ordered(x[1], my_levels) <= max_level)
-  parsed_taxonomy <- parsed_taxonomy[filter]
-  paste(sapply(parsed_taxonomy, paste, collapse='__'), collapse=';')
-}
-
-subsample_by_taxonomy <- function(taxon, triangular=TRUE, level = 'subtaxon', max_subset=NA) {
-  base_level <- offset_ordered_factor(taxonomy_data[taxon, 'level'], 1)
-  if (level == 'subtaxon') {
-    level <- base_level
-  }
-  if (is.na(level) | taxonomy_data[taxon, 'level'] >= level) {
-    return(NA)
-  }
-  indexes <- grep(taxon, distance_matrix_taxonomy, value = FALSE, fixed = TRUE)
-  if (!is.na(max_subset) && length(indexes) > max_subset) {
-    indexes = sample(indexes, max_subset)
-  }
-  submatrix <- distance_matrix[indexes, indexes, drop = FALSE]
-  names <- distance_matrix_taxonomy[indexes]
-  names <- mapply(FUN=filter_taxonomy_string, names, MoreArgs=list(base_level, level))
-  row.names(submatrix) <- names
-  colnames(submatrix) <- names
-  if (triangular) {
-    submatrix[upper.tri(submatrix, diag=TRUE)] <- NA
-  }
-  return(submatrix)
-}
-
 fapply <- function(data_frame, functions, preprocessor={function(x) x}, preprocessor_args=list(), append=FALSE, ...) {
   apply_functions <- function(input, functions, ...) {
     input <- append(input, list(...))
@@ -122,7 +90,6 @@ fapply <- function(data_frame, functions, preprocessor={function(x) x}, preproce
   }
   return(output)
 }
-
 
 remove_outliers <- function(x, na.rm = TRUE, ...) {
   qnt <- quantile(x, probs=c(.01, .99), na.rm = na.rm, ...)
