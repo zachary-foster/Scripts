@@ -117,62 +117,51 @@ distance_distribution <- function(taxon, distance, identity, distance_bin_width=
   return(list(distance_distribution=file_path))
 }
 
-threshold_optimization_graph <- function(taxon, distance, identity) {
-  min_x = 0
-  max_x = quantile(data, .8, na.rm=TRUE, type=3)
+threshold_optimization <- function(taxon, distance, identity, threshold_resolution=0.001, ...) {
+  if (length(unique(rownames(distance))) < 2) {
+    return(list(threshold_optimization = NA,
+                optimal_threshold = NA, 
+                optimal_false_negative = NA,
+                optimal_false_positive = NA,
+                optimal_error = NA))
+  }
   #convert lower tri matrix to full
-  data[upper.tri(data, diag=TRUE)] <- t(data)[upper.tri(data, diag=TRUE)]
-  diag(data) <- 0
-  taxon_name <- as.character(taxonomy_data[taxon, 'name'])
-  file_name <- paste(c(taxonomy_levels[as.character(taxonomy_data[taxon, 'level'])], '_', 
+  distance[upper.tri(distance, diag=TRUE)] <- t(distance)[upper.tri(distance, diag=TRUE)]
+  diag(distance) <- 0
+
+  #Get output file path
+  taxon_name <- as.character(taxon$name)
+  file_name <- paste(c(taxonomy_levels[taxon$level], '_', 
                        taxon_name,
-                       '_', as.character(taxonomy_data[taxon, 'id']),
-                       '.png'), collapse="") 
-  sub_directory <- file.path(plot_directory, 'threshold_optimization', fsep = .Platform$file.sep)
+                       '_', as.character(taxon$id),'.txt'), collapse="") 
+  sub_directory <- file.path(output_directory, 'threshold_optimization', fsep = .Platform$file.sep)
   file_path <- file.path(sub_directory, file_name, fsep = .Platform$file.sep)
+
+  #prepare output directory
   if (!file.exists(sub_directory)) {
     dir.create(sub_directory, recursive=TRUE)
   }
-  threshold <- seq(min_x, max_x, by = .0005)
-  statistics <- lapply(threshold, function(x) threshOpt(data, row.names(data), thresh = x))
-  statistics <- as.data.frame(do.call(rbind, statistics))
-  optimal_error <- min(statistics[,'Cumulative error'])
-  optimal_index <- which(optimal_error == statistics[,'Cumulative error']) 
-  optimal_threshold <- mean(statistics[optimal_index,'Threshold'], rm.na=TRUE)
-  optimal_false_negative <- statistics[optimal_index[1],'False neg']
-  optimal_false_positive <- statistics[optimal_index[length(optimal_index)],'False pos']
-  min_x_display = 0
-  #max_x_display = statistics[quantile(statistics[,'False neg'], 0.9, type=3) == statistics[,'False neg'],'Threshold'][1]
-  optimal_error_proportion <- optimal_error / nrow(data)
-  error_at_max_x <- ((1 - optimal_error_proportion) / 2) + optimal_error_proportion
-  max_x_display = statistics[which(statistics[,'False neg'] / nrow(data) > error_at_max_x)[1], 'Threshold']
-  if (is.na(max_x_display)) {
-    max_x_display = max_x
-  }
-  statistics <- melt(statistics, measure.vars=4:6, id.vars = 1,  na.rm=TRUE)
-  statistics$value <- statistics$value / nrow(data)
-  png(file = file_path, bg = "transparent")
-  my_plot <- ggplot(statistics[statistics$variable != "Cumulative error",], aes(x=Threshold, y=value)) + 
-    geom_area(aes(fill = variable), alpha = .3, , position='identity') +
-    geom_line(data=statistics[statistics$variable == "Cumulative error",], , position='identity') +
-    labs(title=taxon_name) +
-    scale_x_continuous(limits = c(min_x_display, max_x_display)) +
-    theme(title=element_text(size=30),
-          axis.line=element_blank(),
-          #          axis.text.x=element_blank(),
-          #          axis.text.y=element_blank(),
-          #          axis.ticks=element_blank(),
-          axis.title.x=element_blank(),
-          axis.title.y=element_blank(),
-          legend.position="none",
-          panel.background=element_blank(),
-          panel.border=element_blank(),
-          panel.grid.major=element_blank(),
-          panel.grid.minor=element_blank(),
-          plot.background=element_blank())
-  print(my_plot)
-  dev.off()
-  return(list(file_path, optimal_threshold, optimal_false_negative, optimal_false_positive, optimal_error))
+
+  #Calulate threshold error rates
+  min_x = 0
+  max_x = quantile(distance, .8, na.rm=TRUE, type=3)
+  threshold <- seq(min_x, max_x, by = threshold_resolution)
+  statistics <- lapply(threshold, function(x) threshOpt(distance, row.names(distance), thresh = x))
+  statistics <- ldply(statistics)
+  colnames(statistics) <- c("threshold", "true_negative", "true_positive", "false_negative", "false_positive", "cumulative_error")
+  optimal_error <- min(statistics$cumulative_error)
+  optimal_index <- which(optimal_error == statistics$cumulative_error) 
+  optimal_threshold <- mean(statistics[optimal_index,'threshold'], rm.na=TRUE)
+  optimal_false_negative <- statistics[optimal_index[1],'false_negative']
+  optimal_false_positive <- statistics[optimal_index[length(optimal_index)],'false_positive']
+
+  #write output data
+  write.table(format(statistics, scientific = FALSE) , file=file_path, sep="\t", quote=FALSE, row.names=FALSE)
+  return(list(threshold_optimization = file_path,
+              optimal_threshold = optimal_threshold, 
+              optimal_false_negative = optimal_false_negative,
+              optimal_false_positive = optimal_false_positive,
+              optimal_error = optimal_error))
 }
 
 # functions_to_apply <- list(overall_statistics = c("distance_mean", "distance_sd", "distance_count", "subsampled_count"), 
@@ -217,7 +206,8 @@ subsample_by_taxonomy <- function(taxon, triangular=TRUE, level = 'subtaxon', ma
 functions_to_apply <- list("overall_statistics",
                            "intertaxon_statistics",
                            "intrataxon_statistics",
-                           "distance_distribution")
+                           "distance_distribution",
+                           "threshold_optimization")
 
 get_stat_function_args <- function(data_frame_row, ...) {
   distance <- subsample_by_taxonomy(data_frame_row$.rownames, ...)
@@ -229,7 +219,8 @@ taxon_statistics <- fapply(taxonomy_data, functions_to_apply,
                            preprocessor_args = list(level = level_to_analyze, 
                                                     max_subset = max_sequences_to_compare),
                            append=T, 
-                           distance_bin_width=0.001)
+                           distance_bin_width=0.001,
+                           threshold_resolution=0.001)
 
 
 #Calculate statistics derived from other statistics
