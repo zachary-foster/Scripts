@@ -4,7 +4,52 @@ source("functions.R")
 taxonomy_levels = c(k='Kingdom', d='Domain', p='Phylum', c='Class', sc='Subclass', o='Order', so='Suborder', f='Family', g='Genus', s='Species', i='Individual')
 taxonomy_separator = ';'
 
-#Functions for calculating taxon-specific statiscs
+#Parameters
+distance_matrix_file = "/home/local/USDA-ARS/fosterz/Repositories/Analysis/taxon_specific_barcode_gap/rdp_fungi_28s_1/test_distance_matrix.txt"
+taxonomy_file = "/home/local/USDA-ARS/fosterz/Repositories/Analysis/taxon_specific_barcode_gap/rdp_fungi_28s_1/test_database_taxon_statistics.txt"
+root_directory = "/home/local/USDA-ARS/fosterz/Repositories/Analysis/taxon_specific_barcode_gap/rdp_fungi_28s_1/test"
+level_to_analyze = 's'
+distance_type = 'PID'
+max_sequences_to_compare = 100
+append_to_input = FALSE
+distance_bin_width = 0.001
+threshold_resolution = 0.001
+remove_na_rows = TRUE
+functions_to_apply <- list("overall_statistics",
+                           "intertaxon_statistics",
+                           "intrataxon_statistics",
+                           "distance_distribution",
+                           "threshold_optimization")
+
+
+#Derived Parameters
+output_directory_name = paste(distance_type, '_', taxonomy_levels[level_to_analyze], sep='') 
+output_directory = file.path(root_directory, output_directory_name, fsep = .Platform$file.sep)
+taxon_statistics_output_name = paste('taxon_statistics', '_', output_directory_name, '.txt', sep='')
+taxon_statistics_output_path =  file.path(output_directory, taxon_statistics_output_name, fsep = .Platform$file.sep)
+
+#load and format distance matrix (CAN TAKE LONG TIME)
+distance_matrix = as.matrix(read.csv(distance_matrix_file, sep="\t", row.names=1, header=FALSE))
+distance_matrix_names = row.names(distance_matrix)
+distance_matrix_taxonomy = sapply(strsplit(distance_matrix_names, split='|', fixed=TRUE), function(x) x[3])
+
+#If the metric is similarity (ie 1=same instead of 0), convert to distance
+if (distance_matrix[1,1] == 1) {
+  distance_matrix = 1 - distance_matrix
+}
+
+#load taxonomy statistics
+taxonomy_data = read.csv(taxonomy_file, sep="\t", row.names=2, header=TRUE)
+
+#order taxonomic levels into an ordered factor based on order of occurance in stats file
+taxonomy_data$level <- ordered(taxonomy_data$level, levels=names(taxonomy_levels))
+
+#Prepare output directory
+if (!file.exists(output_directory)) {
+  dir.create(output_directory, recursive=TRUE)
+}
+
+#Functions for calculating additional taxon-specific statiscs
 overall_statistics <- function(taxon, distance, identity, ...) {
   if (!is.matrix(distance)) {
     return(list(distance_mean=NA, 
@@ -93,7 +138,7 @@ threshold_optimization <- function(taxon, distance, identity, threshold_resoluti
   #convert lower tri matrix to full
   distance[upper.tri(distance, diag=TRUE)] <- t(distance)[upper.tri(distance, diag=TRUE)]
   diag(distance) <- 0
-  
+
   #Get output file path
   taxon_name <- as.character(taxon$name)
   file_name <- paste(c(taxonomy_levels[taxon$level], '_', 
@@ -101,12 +146,12 @@ threshold_optimization <- function(taxon, distance, identity, threshold_resoluti
                        '_', as.character(taxon$id),'.txt'), collapse="") 
   sub_directory <- file.path(output_directory, 'threshold_optimization', fsep = .Platform$file.sep)
   file_path <- file.path(sub_directory, file_name, fsep = .Platform$file.sep)
-  
+
   #prepare output directory
   if (!file.exists(sub_directory)) {
     dir.create(sub_directory, recursive=TRUE)
   }
-  
+
   #Calulate threshold error rates
   min_x = 0
   max_x = quantile(distance, .8, na.rm=TRUE, type=3)
@@ -119,7 +164,7 @@ threshold_optimization <- function(taxon, distance, identity, threshold_resoluti
   optimal_threshold <- mean(statistics[optimal_index,'threshold'], rm.na=TRUE)
   optimal_false_negative <- statistics[optimal_index[1],'false_negative']
   optimal_false_positive <- statistics[optimal_index[length(optimal_index)],'false_positive']
-  
+
   #write output data
   write.table(format(statistics, scientific = FALSE) , file=file_path, sep="\t", quote=FALSE, row.names=FALSE)
   return(list(threshold_optimization = file_path,
@@ -128,56 +173,6 @@ threshold_optimization <- function(taxon, distance, identity, threshold_resoluti
               optimal_false_positive = optimal_false_positive,
               optimal_error = optimal_error))
 }
-
-
-
-
-#Parameters
-distance_matrix_file = "/home/local/USDA-ARS/fosterz/Repositories/Analysis/taxon_specific_barcode_gap/rdp_fungi_28s_1/test_distance_matrix.txt"
-taxonomy_file = "/home/local/USDA-ARS/fosterz/Repositories/Analysis/taxon_specific_barcode_gap/rdp_fungi_28s_1/test_database_taxon_statistics.txt"
-root_directory = "/home/local/USDA-ARS/fosterz/Repositories/Analysis/taxon_specific_barcode_gap/rdp_fungi_28s_1/test"
-level_to_analyze = 'g'
-distance_type = 'PID'
-max_sequences_to_compare = 100
-append_to_input = FALSE
-distance_bin_width = 0.001
-threshold_resolution = 0.001
-functions_to_apply <- list("overall_statistics",
-                           "intertaxon_statistics",
-                           "intrataxon_statistics",
-                           "distance_distribution",
-                           "threshold_optimization")
-
-
-
-
-#Derived Parameters
-output_directory_name = paste(distance_type, '_', taxonomy_levels[level_to_analyze], sep='') 
-output_directory = file.path(root_directory, output_directory_name, fsep = .Platform$file.sep)
-taxon_statistics_output_name = paste('taxon_statistics', '_', output_directory_name, '.txt', sep='')
-taxon_statistics_output_path =  file.path(output_directory, taxon_statistics_output_name, fsep = .Platform$file.sep)
-
-#load and format distance matrix (CAN TAKE LONG TIME)
-distance_matrix = as.matrix(read.csv(distance_matrix_file, sep="\t", row.names=1, header=FALSE))
-distance_matrix_names = row.names(distance_matrix)
-distance_matrix_taxonomy = sapply(strsplit(distance_matrix_names, split='|', fixed=TRUE), function(x) x[3])
-
-#If the metric is similarity (ie 1=same instead of 0), convert to distance
-if (distance_matrix[1,1] == 1) {
-  distance_matrix = 1 - distance_matrix
-}
-
-#load taxonomy statistics
-taxonomy_data = read.csv(taxonomy_file, sep="\t", row.names=2, header=TRUE)
-
-#order taxonomic levels into an ordered factor based on order of occurance in stats file
-taxonomy_data$level <- ordered(taxonomy_data$level, levels=names(taxonomy_levels))
-
-#Prepare output directory
-if (!file.exists(output_directory)) {
-  dir.create(output_directory, recursive=TRUE)
-}
-
 
 #apply functions to subsets of distance matrix for each taxon (CAN TAKE LONG TIME)
 filter_taxonomy_string <- function(taxon, min_level, max_level) {
@@ -226,6 +221,11 @@ taxon_statistics <- fapply(taxonomy_data, functions_to_apply,
                            distance_bin_width = distance_bin_width,
                            threshold_resolution = threshold_resolution)
 
+#Remove rows that are all NA 
+if (remove_na_rows) {
+  na_rows <- sapply(1:nrow(taxon_statistics), function(x) sum(!is.na(taxon_statistics[x,])) != 0)
+  taxon_statistics <- taxon_statistics[na_rows, ]
+}
 
 #Calculate statistics derived from other statistics
 taxon_statistics$inter_intra_differnece <- taxon_statistics$intertaxon_distance_mean - taxon_statistics$intrataxon_distance_mean
