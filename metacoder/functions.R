@@ -80,8 +80,17 @@ fapply <- function(iterable, functions,
                    allow_complex=TRUE,
                    ...) {
   apply_functions <- function(input, functions, ...) {
+    if (!is.list(input)) {
+      input <- list(input)
+    }
     input <- append(input, list(...))
-    results <- unlist(lapply(functions, function(f) do.call(f, input)), recursive=FALSE)
+    results <- lapply(functions, function(f) do.call(f, input))
+    atomics <- which(!sapply(results, is.recursive))
+    results[atomics] <- lapply(1:length(atomics), function(i) {y <- list(results[atomics[i]]); 
+                                                               names(y) <- functions[i];
+                                                               y})
+    results <- unlist(results, recursive=FALSE)
+    
     if (allow_complex) {
       results <- lapply(results, function(x) if (is.recursive(x)) {I(x)} else {x})
     } else {
@@ -92,9 +101,19 @@ fapply <- function(iterable, functions,
   if (length(iterable) < 1) {
     return(NULL)
   }
-  output <- lapply(1:length(iterable[[1]]), function(x) apply_functions(do.call(preprocessor, append(list(iterable[x,]), preprocessor_args)), functions, ...))
+  if (is.data.frame(iterable) | is.matrix(iterable)) {
+    iterable_length <- length(iterable[[1]])    
+    call_preprocessor <- function(i) {do.call(preprocessor, append(list(iterable[i,]), preprocessor_args))}
+  } else if (is.list(iterable)) {
+    iterable_length <- length(iterable)
+    call_preprocessor <- function(i) {do.call(preprocessor, append(list(iterable[[i]]), preprocessor_args))}    
+  } else {
+    iterable_length <- length(iterable)
+    call_preprocessor <- function(i) {do.call(preprocessor, append(list(iterable[i]), preprocessor_args))}        
+  }
+  output <- lapply(1:iterable_length, function(i) apply_functions(call_preprocessor(i), functions, ...))
   column_names <- names(output[[1]])
-  output <- lapply(1:length(output[[1]]), function(x) lapply(output, function(row) row[[x]]))
+  output <- lapply(1:length(output[[1]]), function(i) lapply(output, function(row) row[[i]]))
   output <- as.data.frame(do.call(cbind, output))
   colnames(output) <- column_names
   if (is.data.frame(iterable) | is.matrix(iterable)) {
