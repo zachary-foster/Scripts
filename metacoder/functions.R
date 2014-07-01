@@ -122,6 +122,17 @@ fapply <- function(iterable, functions,
   row.names(output) <- row_names
   return(output)
 }
+rm_ext <- function(file) {
+  sub("[.][^.]*$", "", file, perl=TRUE)
+}
+
+next_incremental_file_number <-function(directory) {
+  current_numbers <- as.integer(rm_ext(list.files(directory, no..=TRUE)))
+  if (length(current_numbers) == 0) {
+    current_numbers = 0
+  }
+  max(current_numbers) + 1
+}
 
 remove_na_rows <- function(input) {
   na_rows <- sapply(1:nrow(input), function(x) sum(!is.na(input[x,])) != 0)
