@@ -50,7 +50,7 @@ if (!file.exists(output_directory)) {
 }
 
 #Functions for calculating additional taxon-specific statiscs
-taxon_output_path_preparation <- function(output_directory, sub_directory=NULL, name=NULL, id=NULL, level=NULL, ext="", ...) {
+taxon_output_path_preparation <- function(output_directory, sub_directory=NULL, name=NULL, id=NULL, level_name=NULL, ext="", ...) {
   #get directory path
   if (!is.null(sub_directory)) {
     output_directory <- file.path(output_directory, sub_directory, fsep = .Platform$file.sep)
@@ -60,9 +60,9 @@ taxon_output_path_preparation <- function(output_directory, sub_directory=NULL, 
     dir.create(output_directory, recursive=TRUE)
   }  
   #get output file name
-  file_name <- paste(as.character(c(level,
-                                    name,
-                                    id)),
+  file_name <- paste(c(as.character(level_name),
+                       as.character(name),
+                       as.character(id)),
                      collapse="_") 
   if (file_name == "") { #if file name information is NULL assume that files are incremental integers. 
     file_name = as.character(next_incremental_file_number(output_directory))
@@ -125,9 +125,13 @@ intrataxon_statistics <- function(distance, identity=NULL, ...) {
 
   if (is_valid_input) {
     intra_data <- distance[identity]
-    output$intrataxon_distance_mean <- mean(intra_data, na.rm=TRUE)
-    output$intrataxon_distance_sd <- sd(intra_data, na.rm=TRUE)
     output$intrataxon_distance_count <- sum(!is.na(intra_data))
+    if (output$intrataxon_distance_count == 0) {
+      output$intrataxon_distance_mean <- NA
+    } else {
+      output$intrataxon_distance_mean <- mean(intra_data, na.rm=TRUE)
+    }
+    output$intrataxon_distance_sd <- sd(intra_data, na.rm=TRUE)
     output$subtaxon_count <- length(unique(rownames(distance)))
   } else {
     output$intrataxon_distance_mean <- NA
@@ -178,7 +182,7 @@ distance_distribution <- function(distance, identity=NULL, distance_bin_width=0.
       } else {
         file_path <- output_file_path
       }
-      write.table(format(output, scientific = FALSE) , file=file_path, sep="\t", quote=FALSE, row.names=FALSE)    
+      write.table(format(distance_distribution, scientific = FALSE) , file=file_path, sep="\t", quote=FALSE, row.names=FALSE)    
     } else {
       file_path <- NA
     }
@@ -299,11 +303,12 @@ subsample_by_taxonomy <- function(taxon, triangular=TRUE, level = 'subtaxon', ma
 }
 
 get_stat_function_arguments <- function(data_frame_row, ...) {
-  list(subsample_by_taxonomy(row.names(data_frame_row), ...),
+  distance <- subsample_by_taxonomy(row.names(data_frame_row), ...)
+  list(distance,
        identity = sapply(rownames(distance), function(x) colnames(distance) == x),
        name = data_frame_row$name,
        id = data_frame_row$id,
-       level = taxonomy_levels[data_frame_row$level])
+       level_name = taxonomy_levels[data_frame_row$level])
 }
 
 taxon_statistics <- fapply(taxonomy_data, functions_to_apply,

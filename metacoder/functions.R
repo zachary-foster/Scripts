@@ -92,7 +92,7 @@ fapply <- function(iterable, functions,
                                                                  y})
     }
     results <- unlist(results, recursive=FALSE)
-    if (!allow_complex) {
+    if (!.allow_complex) {
       results <- results[!sapply(results, is.recursive)]
     }
     return(results)
@@ -103,15 +103,15 @@ fapply <- function(iterable, functions,
   if (is.data.frame(iterable) | is.matrix(iterable)) {
     iterable_length <- length(iterable[[1]])    
     row_names <- row.names(iterable)
-    call_preprocessor <- function(i) {do.call(preprocessor, append(list(iterable[i,]), preprocessor_args))}
+    call_preprocessor <- function(i) {do.call(.preprocessor, append(list(iterable[i,]), .preprocessor_args))}
   } else if (is.list(iterable)) {
     iterable_length <- length(iterable)
     row_names <- unlist(iterable)
-    call_preprocessor <- function(i) {do.call(preprocessor, append(list(iterable[[i]]), preprocessor_args))}    
+    call_preprocessor <- function(i) {do.call(.preprocessor, append(list(iterable[[i]]), .preprocessor_args))}    
   } else {
     iterable_length <- length(iterable)
     row_names <- iterable
-    call_preprocessor <- function(i) {do.call(preprocessor, append(list(iterable[i]), preprocessor_args))}        
+    call_preprocessor <- function(i) {do.call(.preprocessor, append(list(iterable[i]), .preprocessor_args))}        
   }
   output <- lapply(1:iterable_length, function(i) apply_functions(call_preprocessor(i), functions, ...))
   column_names <- names(output[[1]])
