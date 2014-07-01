@@ -50,7 +50,28 @@ if (!file.exists(output_directory)) {
 }
 
 #Functions for calculating additional taxon-specific statiscs
-overall_statistics <- function(taxon, distance, identity, ...) {
+
+taxon_stat_output_path_preparation <- function(output_directory, sub_directory=NULL, name=NULL, id=NULL, level=NULL, ext="") {
+  #get output file name
+  file_name <- paste(c(level,
+                       as.character(name),
+                       as.character(id)),
+                     collapse="_") 
+  file_name <- paste(c(file_name,
+                       ext),
+                     collapse="") 
+  #get path
+  if (!is.null(sub_directory)) {
+    output_directory <- file.path(output_directory, sub_directory, fsep = .Platform$file.sep)
+  }
+  file_path <- file.path(output_directory, file_name, fsep = .Platform$file.sep)
+  #prepare output directory
+  if (!file.exists(output_directory)) {
+    dir.create(output_directory, recursive=TRUE)
+  }  
+} 
+
+overall_statistics <- function(distance, identity, ...) {
   if (!is.matrix(distance)) {
     return(list(distance_mean=NA, 
                 distance_sd=NA,
@@ -68,7 +89,7 @@ overall_statistics <- function(taxon, distance, identity, ...) {
               subsampled_count=nrow(distance)))
 }
 
-intertaxon_statistics <- function(taxon, distance, identity, ...) {
+intertaxon_statistics <- function(distance, identity, ...) {
   if (length(unique(rownames(distance))) < 2) {
     return(list(intertaxon_distance_mean=NA,
                 intertaxon_distance_sd=NA,
@@ -80,7 +101,7 @@ intertaxon_statistics <- function(taxon, distance, identity, ...) {
               intertaxon_distance_count=sum(!is.na(inter_data))))
 }
 
-intrataxon_statistics <- function(taxon, distance, identity, ...) {
+intrataxon_statistics <- function(distance, identity, ...) {
   subtaxon_count <- length(unique(rownames(distance)))
   if (subtaxon_count < 2) {
     return(list(intrataxon_distance_mean=NA,
@@ -95,7 +116,7 @@ intrataxon_statistics <- function(taxon, distance, identity, ...) {
               subtaxon_count=subtaxon_count))
 }
 
-distance_distribution <- function(taxon, distance, identity, distance_bin_width=0.001, ...) {
+distance_distribution <- function(distance, identity, distance_bin_width=0.001, name=NULL, ...) {
   if (!is.matrix(distance) | sum(!is.na(distance)) == 0) {
     return(list(distance_distribution_file=NA,
                 distance_distribution=NA))
@@ -112,24 +133,13 @@ distance_distribution <- function(taxon, distance, identity, distance_bin_width=
     output <- cbind(output, same=same_hist$counts, different=different_hist$counts)
   }
   
-  #get output file path
-  file_name <- paste(c(taxonomy_levels[taxon$level], '_', 
-                       as.character(taxon$name),
-                       '_', as.character(taxon$id),
-                       '.txt'), collapse="") 
-  #prepare output directory
-  sub_directory <- file.path(output_directory, 'distance_distribution', fsep = .Platform$file.sep)
-  file_path <- file.path(sub_directory, file_name, fsep = .Platform$file.sep)
-  if (!file.exists(sub_directory)) {
-    dir.create(sub_directory, recursive=TRUE)
-  }
   #write output data
   write.table(format(output, scientific = FALSE) , file=file_path, sep="\t", quote=FALSE, row.names=FALSE)
   return(list(distance_distribution_file=file_path,
               distance_distribution=output))
 }
 
-threshold_optimization <- function(taxon, distance, identity, threshold_resolution=0.001, ...) {
+threshold_optimization <- function(distance, identity, threshold_resolution=0.001, ...) {
   if (length(unique(rownames(distance))) < 2) {
     return(list(threshold_optimization_file = NA,
                 threshold_optimization = NA,
