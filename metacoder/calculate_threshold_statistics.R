@@ -50,25 +50,33 @@ if (!file.exists(output_directory)) {
 }
 
 #Functions for calculating additional taxon-specific statiscs
+rm_ext <- function(file) {
+  filenames.noext = sub("[.][^.]*$", "", filenames.ext, perl=TRUE)
+}
+
 
 taxon_stat_output_path_preparation <- function(output_directory, sub_directory=NULL, name=NULL, id=NULL, level=NULL, ext="") {
-  #get output file name
-  file_name <- paste(c(level,
-                       as.character(name),
-                       as.character(id)),
-                     collapse="_") 
-  file_name <- paste(c(file_name,
-                       ext),
-                     collapse="") 
-  #get path
+  #get directory path
   if (!is.null(sub_directory)) {
     output_directory <- file.path(output_directory, sub_directory, fsep = .Platform$file.sep)
   }
-  file_path <- file.path(output_directory, file_name, fsep = .Platform$file.sep)
   #prepare output directory
   if (!file.exists(output_directory)) {
     dir.create(output_directory, recursive=TRUE)
   }  
+  #get output file name
+  file_name <- paste(as.character(c(level,
+                                    name,
+                                    id)),
+                     collapse="_") 
+  if (file_name == "") { #if file name information is NULL assume that files are incremental integers. 
+    file_name = as.character(max(as.integer(rm_ext(list.files(output_directory, no..=TRUE)))) + 1)
+  }
+  #add extension
+  file_name <- paste(c(file_name,
+                       ext),
+                     collapse="") 
+  file.path(output_directory, file_name, fsep = .Platform$file.sep)
 } 
 
 overall_statistics <- function(distance, identity, ...) {
