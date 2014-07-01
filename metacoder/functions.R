@@ -75,9 +75,9 @@ offset_ordered_factor <- function(ordered_factor, offset) {
 }
 
 fapply <- function(iterable, functions, 
-                   preprocessor={function(x) x},
-                   preprocessor_args=list(),
-                   allow_complex=TRUE,
+                   .preprocessor={function(x) x},
+                   .preprocessor_args=list(),
+                   .allow_complex=TRUE,
                    ...) {
   apply_functions <- function(input, functions, ...) {
     if (!is.list(input)) {

@@ -50,7 +50,7 @@ if (!file.exists(output_directory)) {
 }
 
 #Functions for calculating additional taxon-specific statiscs
-taxon_output_path_preparation <- function(output_directory, sub_directory=NULL, name=NULL, id=NULL, level=NULL, ext="") {
+taxon_output_path_preparation <- function(output_directory, sub_directory=NULL, name=NULL, id=NULL, level=NULL, ext="", ...) {
   #get directory path
   if (!is.null(sub_directory)) {
     output_directory <- file.path(output_directory, sub_directory, fsep = .Platform$file.sep)
@@ -74,7 +74,7 @@ taxon_output_path_preparation <- function(output_directory, sub_directory=NULL, 
   file.path(output_directory, file_name, fsep = .Platform$file.sep)
 } 
 
-overall_statistics <- function(distance, identity, ...) {
+overall_statistics <- function(distance, ...) {
   if (!is.matrix(distance)) {
     return(list(distance_mean=NA, 
                 distance_sd=NA,
@@ -92,103 +92,175 @@ overall_statistics <- function(distance, identity, ...) {
               subsampled_count=nrow(distance)))
 }
 
-intertaxon_statistics <- function(distance, identity, ...) {
-  if (length(unique(rownames(distance))) < 2) {
-    return(list(intertaxon_distance_mean=NA,
-                intertaxon_distance_sd=NA,
-                intertaxon_distance_count=NA))
-  }
-  inter_data <- distance[!identity]
-  return(list(intertaxon_distance_mean=mean(inter_data, na.rm=TRUE),
-              intertaxon_distance_sd=sd(inter_data, na.rm=TRUE),
-              intertaxon_distance_count=sum(!is.na(inter_data))))
-}
-
-intrataxon_statistics <- function(distance, identity, ...) {
-  subtaxon_count <- length(unique(rownames(distance)))
-  if (subtaxon_count < 2) {
-    return(list(intrataxon_distance_mean=NA,
-                intrataxon_distance_sd=NA,
-                intrataxon_distance_count=NA,
-                subtaxon_count=NA))
-  }
-  intra_data <- distance[identity]
-  return(list(intrataxon_distance_mean=mean(intra_data, na.rm=TRUE),
-              intrataxon_distance_sd=sd(intra_data, na.rm=TRUE),
-              intrataxon_distance_count=sum(!is.na(intra_data)),
-              subtaxon_count=subtaxon_count))
-}
-
-distance_distribution <- function(distance, identity, distance_bin_width=0.001, name=NULL, ...) {
-  if (!is.matrix(distance) | sum(!is.na(distance)) == 0) {
-    return(list(distance_distribution_file=NA,
-                distance_distribution=NA))
-  }
-  #Calculate distance distribution
-  breaks <- seq(as.integer(min(distance, na.rm=TRUE) / distance_bin_width),
-                as.integer(max(distance, na.rm=TRUE) / distance_bin_width) + 1)
-  breaks <- breaks * distance_bin_width
-  total_hist <- hist(distance, plot=FALSE, breaks=breaks)
-  output <- data.frame(count_middle=total_hist$mids, total=total_hist$counts)
-  if (length(unique(rownames(distance))) >= 2) {
-    same_hist <- hist(distance[identity], plot=FALSE, breaks=breaks)
-    different_hist <- hist(distance[!identity], plot=FALSE, breaks=breaks)
-    output <- cbind(output, same=same_hist$counts, different=different_hist$counts)
+intertaxon_statistics <- function(distance, identity=NULL, ...) {
+  output <- list()
+  
+  if (is.null(identity)) {
+    identity = sapply(rownames(distance), function(x) colnames(distance) == x)
   }
   
-  #write output data
-  write.table(format(output, scientific = FALSE) , file=file_path, sep="\t", quote=FALSE, row.names=FALSE)
-  return(list(distance_distribution_file=file_path,
-              distance_distribution=output))
+  is_valid_input <- length(identity) > 0 && length(table(identity)) == 2
+
+  if (is_valid_input) {
+    inter_data <- distance[!identity]
+    output$intertaxon_distance_mean <- mean(inter_data, na.rm=TRUE)
+    output$intertaxon_distance_sd <- sd(inter_data, na.rm=TRUE)
+    output$intertaxon_distance_count <- sum(!is.na(inter_data))
+  } else {
+    output$intertaxon_distance_mean <- NA
+    output$intertaxon_distance_sd <- NA
+    output$intertaxon_distance_count <- NA
+  }
+  return(output)
 }
 
-threshold_optimization <- function(distance, identity, threshold_resolution=0.001, ...) {
-  if (length(unique(rownames(distance))) < 2) {
-    return(list(threshold_optimization_file = NA,
-                threshold_optimization = NA,
-                optimal_threshold = NA, 
-                optimal_false_negative = NA,
-                optimal_false_positive = NA,
-                optimal_error = NA))
+intrataxon_statistics <- function(distance, identity=NULL, ...) {
+  output <- list()
+  
+  if (is.null(identity)) {
+    identity = sapply(rownames(distance), function(x) colnames(distance) == x)
   }
-  #convert lower tri matrix to full
-  distance[upper.tri(distance, diag=TRUE)] <- t(distance)[upper.tri(distance, diag=TRUE)]
-  diag(distance) <- 0
+  
+  is_valid_input <- length(identity) > 0 && length(table(identity)) == 2
 
-  #Get output file path
-  taxon_name <- as.character(taxon$name)
-  file_name <- paste(c(taxonomy_levels[taxon$level], '_', 
-                       taxon_name,
-                       '_', as.character(taxon$id),'.txt'), collapse="") 
-  sub_directory <- file.path(output_directory, 'threshold_optimization', fsep = .Platform$file.sep)
-  file_path <- file.path(sub_directory, file_name, fsep = .Platform$file.sep)
+  if (is_valid_input) {
+    intra_data <- distance[identity]
+    output$intrataxon_distance_mean <- mean(intra_data, na.rm=TRUE)
+    output$intrataxon_distance_sd <- sd(intra_data, na.rm=TRUE)
+    output$intrataxon_distance_count <- sum(!is.na(intra_data))
+    output$subtaxon_count <- length(unique(rownames(distance)))
+  } else {
+    output$intrataxon_distance_mean <- NA
+    output$intrataxon_distance_sd <- NA
+    output$intrataxon_distance_count <- NA
+    output$subtaxon_count <- NA
+  }
+  return(output)
+}
 
-  #prepare output directory
-  if (!file.exists(sub_directory)) {
-    dir.create(sub_directory, recursive=TRUE)
+distance_distribution <- function(distance, identity=NULL, distance_bin_width=0.001, output_file_path=NULL, ...) {
+  output <- list()
+  
+  if (is.null(identity)) {
+    identity = sapply(rownames(distance), function(x) colnames(distance) == x)
+  }
+  
+  #Validate input data
+  is_valid_input = is.matrix(distance) && sum(!is.na(distance)) > 0
+  
+  #Calculate distance distribution
+  if (is_valid_input) {
+    breaks <- seq(as.integer(min(distance, na.rm=TRUE) / distance_bin_width),
+                  as.integer(max(distance, na.rm=TRUE) / distance_bin_width) + 1)
+    breaks <- breaks * distance_bin_width
+    total_hist <- hist(distance, plot=FALSE, breaks=breaks)
+    distance_distribution <- data.frame(count_middle=total_hist$mids, total=total_hist$counts)
+    if (length(unique(rownames(distance))) >= 2) {
+      same_hist <- hist(distance[identity], plot=FALSE, breaks=breaks)
+      different_hist <- hist(distance[!identity], plot=FALSE, breaks=breaks)
+      distance_distribution <- cbind(distance_distribution, 
+                                     same=same_hist$counts,
+                                     different=different_hist$counts)
+    }
+  } else {
+    distance_distribution <- NA
+  }
+  output$distance_distribution <- distance_distribution
+  
+  #write output data
+  if (!is.null(output_file_path)) {
+    if (is_valid_input) {
+      if (file.info(output_file_path)$isdir) {
+        file_path <- taxon_output_path_preparation(output_file_path, 
+                                                   sub_directory=as.character(match.call()[[1]]),
+                                                   ext=".txt",
+                                                   ...)
+      } else {
+        file_path <- output_file_path
+      }
+      write.table(format(output, scientific = FALSE) , file=file_path, sep="\t", quote=FALSE, row.names=FALSE)    
+    } else {
+      file_path <- NA
+    }
+    output$distance_distribution_file <- file_path
+  }
+  
+  return(output)
+}
+
+threshold_optimization <- function(distance, threshold_resolution=0.001, output_file_path=NULL, ...) {
+  output <- list()
+  
+  #Validate input data
+  is_valid_input = length(unique(rownames(distance))) >= 2
+  
+  if (is_valid_input) {
+    #convert lower tri matrix to full
+    distance[upper.tri(distance, diag=TRUE)] <- t(distance)[upper.tri(distance, diag=TRUE)]
+    diag(distance) <- 0    
+    
+    #Calulate threshold error rates
+    min_x = 0
+    max_x = quantile(distance, .8, na.rm=TRUE, type=3)
+    threshold <- seq(min_x, max_x, by = threshold_resolution)
+    statistics <- lapply(threshold, function(x) threshOpt(distance, row.names(distance), thresh = x))
+    statistics <- ldply(statistics)
+    colnames(statistics) <- c("threshold", "true_negative", "true_positive", "false_negative", "false_positive", "cumulative_error")
+    output$optimal_error <- min(statistics$cumulative_error)
+    optimal_index <- which(output$optimal_error == statistics$cumulative_error) 
+    output$optimal_threshold <- mean(statistics[optimal_index,'threshold'], rm.na=TRUE)
+    output$optimal_false_negative <- statistics[optimal_index[1],'false_negative']
+    output$optimal_false_positive <- statistics[optimal_index[length(optimal_index)], 'false_positive']
+    output$threshold_optimization <- statistics 
+  } else {
+    output$optimal_error <- NA
+    output$optimal_threshold <- NA
+    output$optimal_false_negative <- NA
+    output$optimal_false_positive <- NA   
+    output$threshold_optimization <- NA
   }
 
-  #Calulate threshold error rates
-  min_x = 0
-  max_x = quantile(distance, .8, na.rm=TRUE, type=3)
-  threshold <- seq(min_x, max_x, by = threshold_resolution)
-  statistics <- lapply(threshold, function(x) threshOpt(distance, row.names(distance), thresh = x))
-  statistics <- ldply(statistics)
-  colnames(statistics) <- c("threshold", "true_negative", "true_positive", "false_negative", "false_positive", "cumulative_error")
-  optimal_error <- min(statistics$cumulative_error)
-  optimal_index <- which(optimal_error == statistics$cumulative_error) 
-  optimal_threshold <- mean(statistics[optimal_index,'threshold'], rm.na=TRUE)
-  optimal_false_negative <- statistics[optimal_index[1],'false_negative']
-  optimal_false_positive <- statistics[optimal_index[length(optimal_index)],'false_positive']
 
   #write output data
-  write.table(format(statistics, scientific = FALSE) , file=file_path, sep="\t", quote=FALSE, row.names=FALSE)
-  return(list(threshold_optimization_file = file_path,
-              threshold_optimization = statistics,
-              optimal_threshold = optimal_threshold, 
-              optimal_false_negative = optimal_false_negative,
-              optimal_false_positive = optimal_false_positive,
-              optimal_error = optimal_error))
+  if (!is.null(output_file_path)) {
+    if (is_valid_input) {
+      if (file.info(output_file_path)$isdir) {
+        file_path <- taxon_output_path_preparation(output_file_path, 
+                                                   sub_directory=as.character(match.call()[[1]]),
+                                                   ext=".txt",
+                                                   ...)
+      } else {
+        file_path <- output_file_path
+      }
+      write.table(format(statistics, scientific = FALSE), file=file_path, sep="\t", quote=FALSE, row.names=FALSE)    
+    } else {
+      file_path <- NA
+    }
+    output$threshold_optimization_file <- file_path
+  }
+  
+  return(output)
+#   #Get output file path
+#   taxon_name <- as.character(taxon$name)
+#   file_name <- paste(c(taxonomy_levels[taxon$level], '_', 
+#                        taxon_name,
+#                        '_', as.character(taxon$id),'.txt'), collapse="") 
+#   sub_directory <- file.path(output_directory, 'threshold_optimization', fsep = .Platform$file.sep)
+#   file_path <- file.path(sub_directory, file_name, fsep = .Platform$file.sep)
+#   
+#   #prepare output directory
+#   if (!file.exists(sub_directory)) {
+#     dir.create(sub_directory, recursive=TRUE)
+#   }
+#   
+#   #write output data
+#   write.table(format(statistics, scientific = FALSE) , file=file_path, sep="\t", quote=FALSE, row.names=FALSE)
+#   return(list(threshold_optimization_file = file_path,
+#               threshold_optimization = statistics,
+#               optimal_threshold = optimal_threshold, 
+#               optimal_false_negative = optimal_false_negative,
+#               optimal_false_positive = optimal_false_positive,
+#               optimal_error = optimal_error))
 }
 
 #apply functions to subsets of distance matrix for each taxon (CAN TAKE LONG TIME)
@@ -226,17 +298,20 @@ subsample_by_taxonomy <- function(taxon, triangular=TRUE, level = 'subtaxon', ma
   return(submatrix)
 }
 
-get_stat_function_args <- function(data_frame_row, ...) {
-  distance <- subsample_by_taxonomy(row.names(data_frame_row), ...)
-  identity <-  sapply(rownames(distance), function(x) colnames(distance) == x)
-  list(data_frame_row, distance, identity)
+get_stat_function_arguments <- function(data_frame_row, ...) {
+  list(subsample_by_taxonomy(row.names(data_frame_row), ...),
+       identity = sapply(rownames(distance), function(x) colnames(distance) == x),
+       name = data_frame_row$name,
+       id = data_frame_row$id,
+       level = taxonomy_levels[data_frame_row$level])
 }
 
 taxon_statistics <- fapply(taxonomy_data, functions_to_apply,
-                           preprocessor = get_stat_function_args,
-                           preprocessor_args = list(level = level_to_analyze, 
+                           .preprocessor = get_stat_function_arguments,
+                           .preprocessor_args = list(level = level_to_analyze, 
                                                     max_subset = max_sequences_to_compare),
-                           allow_complex=TRUE,
+                           .allow_complex=TRUE,
+                           output_file_path=output_directory,
                            distance_bin_width = distance_bin_width,
                            threshold_resolution = threshold_resolution)
 
