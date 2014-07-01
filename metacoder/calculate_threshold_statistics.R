@@ -180,7 +180,7 @@ threshold_optimization <- function(taxon, distance, identity, threshold_resoluti
 
 #apply functions to subsets of distance matrix for each taxon (CAN TAKE LONG TIME)
 
-calculate_threshold_statistics <- function(taxonomy_data, distance_matrix, save_statistics=TRUE
+# calculate_threshold_statistics <- function(taxonomy_data, distance_matrix, save_statistics=TRUE
 filter_taxonomy_string <- function(taxon, min_level, max_level) {
   my_levels <- levels(taxonomy_data[taxon, 'level'])
   parsed_taxonomy <- sapply(unlist(strsplit(taxon, split=';', fixed=T)),
@@ -229,10 +229,10 @@ taxon_statistics <- fapply(taxonomy_data, functions_to_apply,
 
 #Remove rows that are all NA 
 if (remove_na_rows) {
-  na_rows <- sapply(1:nrow(taxon_statistics), function(x) sum(!is.na(taxon_statistics[x,])) != 0)
-  taxon_statistics <- taxon_statistics[na_rows, ]
+  taxon_statistics <- remove_na_rows(taxon_statistics)                          
 }
 
+                                           
 #Calculate statistics derived from other statistics
 taxon_statistics$inter_intra_differnece <- taxon_statistics$intertaxon_distance_mean - taxon_statistics$intrataxon_distance_mean
 taxon_statistics$optimal_error <- (taxon_statistics$optimal_false_negative + taxon_statistics$optimal_false_positive) / taxon_statistics$subsampled_count

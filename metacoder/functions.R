@@ -123,6 +123,11 @@ fapply <- function(iterable, functions,
   return(output)
 }
 
+remove_na_rows <- function(input) {
+  na_rows <- sapply(1:nrow(input), function(x) sum(!is.na(input[x,])) != 0)
+  input[na_rows, ]
+}
+
 remove_outliers <- function(x, na.rm = TRUE, ...) {
   qnt <- quantile(x, probs=c(.01, .99), na.rm = na.rm, ...)
   H <- 1.5 * IQR(x, na.rm = na.rm)
