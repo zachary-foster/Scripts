@@ -123,16 +123,15 @@ fapply <- function(iterable, functions,
   return(output)
 }
 
-filter_taxonomy_string <- function(taxon, min_level, max_level, taxon_level) {
-  my_levels <- levels(taxon_level)
+filter_taxonomy_string <- function(taxon, min_level, max_level, taxon_levels) {
   parsed_taxonomy <- sapply(unlist(strsplit(taxon, split=';', fixed=T)),
                             strsplit, split='__', fixed=T)
-  filter <- sapply(parsed_taxonomy, function(x) ordered(x[1], my_levels) >= min_level & ordered(x[1], my_levels) <= max_level)
+  filter <- sapply(parsed_taxonomy, function(x) ordered(x[1], taxon_levels) >= min_level & ordered(x[1], taxon_levels) <= max_level)
   parsed_taxonomy <- parsed_taxonomy[filter]
   paste(sapply(parsed_taxonomy, paste, collapse='__'), collapse=';')
 }
 
-subsample_by_taxonomy <- function(distance_matrix, taxon, triangular=TRUE, level_to_analyze = 'subtaxon', max_subset=NA, taxon_level) {
+subsample_by_taxonomy <- function(distance_matrix, taxon, taxon_level, level_order, triangular=TRUE, level_to_analyze = 'subtaxon', max_subset=NA) {
   base_level <- offset_ordered_factor(taxon_level, 1)
   if (level_to_analyze == 'subtaxon') {
     level_to_analyze <- base_level
@@ -152,13 +151,31 @@ subsample_by_taxonomy <- function(distance_matrix, taxon, triangular=TRUE, level
   #subsample matrix
   submatrix <- distance_matrix[indexes, indexes, drop = FALSE]
   names <- row.names(submatrix)
-  names <- mapply(FUN=filter_taxonomy_string, names, MoreArgs=list(base_level, level_to_analyze, taxon_level))
+  names <- mapply(FUN=filter_taxonomy_string, names, MoreArgs=list(base_level, level_to_analyze, level_order))
   row.names(submatrix) <- names
   colnames(submatrix) <- names
   if (triangular) {
     submatrix[upper.tri(submatrix, diag=TRUE)] <- NA
   }
   return(submatrix)
+}
+
+taxon_info <- function(identifications, level_order, separator=';') {
+  split_taxonomy <- strsplit(identifications, separator, fixed=TRUE)
+  taxonomy <- unlist(lapply(split_taxonomy, function(x) sapply(seq(1, length(x)), function(y) paste(x[1:y], collapse=separator))))
+  counts <- table(taxonomy)
+  taxon_names <- names(counts)
+  counts <- as.vector(counts)
+  taxon_level <- sapply(strsplit(taxon_names, separator, fixed=TRUE), 
+                        function(x) level_order[max(match(sub("__.*$", "", x), level_order))])
+  taxon_level <- ordered(taxon_level, level_order)
+  taxon_short_names <- sapply(1:length(taxon_names), function(i) filter_taxonomy_string(taxon_names[i], taxon_level[i], taxon_level[i], level_order))
+  taxon_short_names <- sub("^.*__", "", taxon_short_names)
+  data.frame(row.names=taxon_names, 
+             level=taxon_level, 
+             name=taxon_short_names, 
+             count=counts)
+  
 }
 
 rm_ext <- function(file) {

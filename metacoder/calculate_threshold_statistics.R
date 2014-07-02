@@ -273,7 +273,7 @@ threshold_optimization <- function(distance, threshold_resolution=0.001, output_
 
 # calculate_threshold_statistics <- function(taxonomy_data, distance_matrix, save_statistics=TRUE
 get_stat_function_arguments <- function(data_frame_row, ...) {
-  distance <- subsample_by_taxonomy(distance_matrix, row.names(data_frame_row), taxon_level = data_frame_row$level, ...)
+  distance <- subsample_by_taxonomy(distance_matrix, row.names(data_frame_row), data_frame_row$level, names(taxonomy_levels), ...)
   list(distance,
        identity = sapply(rownames(distance), function(x) colnames(distance) == x),
        name = data_frame_row$name,
