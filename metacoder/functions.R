@@ -122,6 +122,45 @@ fapply <- function(iterable, functions,
   row.names(output) <- row_names
   return(output)
 }
+
+filter_taxonomy_string <- function(taxon, min_level, max_level, taxon_level) {
+  my_levels <- levels(taxon_level)
+  parsed_taxonomy <- sapply(unlist(strsplit(taxon, split=';', fixed=T)),
+                            strsplit, split='__', fixed=T)
+  filter <- sapply(parsed_taxonomy, function(x) ordered(x[1], my_levels) >= min_level & ordered(x[1], my_levels) <= max_level)
+  parsed_taxonomy <- parsed_taxonomy[filter]
+  paste(sapply(parsed_taxonomy, paste, collapse='__'), collapse=';')
+}
+
+subsample_by_taxonomy <- function(distance_matrix, taxon, triangular=TRUE, level_to_analyze = 'subtaxon', max_subset=NA, taxon_level) {
+  base_level <- offset_ordered_factor(taxon_level, 1)
+  if (level_to_analyze == 'subtaxon') {
+    level_to_analyze <- base_level
+  }
+  
+  #if the level is not applicable return NA
+  if (is.na(level_to_analyze) || taxon_level >= level_to_analyze) {
+    return(NA)
+  }
+  
+  #get indexes where taxon is present 
+  indexes <- grep(taxon, row.names(distance_matrix), value = FALSE, fixed = TRUE)
+  if (!is.na(max_subset) && length(indexes) > max_subset) {  #if their are too many instances, randomly subsample
+    indexes = sample(indexes, max_subset)
+  }
+  
+  #subsample matrix
+  submatrix <- distance_matrix[indexes, indexes, drop = FALSE]
+  names <- row.names(submatrix)
+  names <- mapply(FUN=filter_taxonomy_string, names, MoreArgs=list(base_level, level_to_analyze, taxon_level))
+  row.names(submatrix) <- names
+  colnames(submatrix) <- names
+  if (triangular) {
+    submatrix[upper.tri(submatrix, diag=TRUE)] <- NA
+  }
+  return(submatrix)
+}
+
 rm_ext <- function(file) {
   sub("[.][^.]*$", "", file, perl=TRUE)
 }
