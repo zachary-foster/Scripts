@@ -40,11 +40,8 @@ if (distance_matrix[1,1] == 1) {
   distance_matrix = 1 - distance_matrix
 }
 
-#load taxonomy statistics
-taxonomy_data = read.csv(taxonomy_file, sep="\t", row.names=2, header=TRUE)
-
-#order taxonomic levels into an ordered factor based on order of occurance in stats file
-taxonomy_data$level <- ordered(taxonomy_data$level, levels=names(taxonomy_levels))
+#Calculate taxonomy statistics
+taxonomy_data = taxon_info(distance_matrix_taxonomy, names(taxonomy_levels))
 
 #Prepare output directory
 if (!file.exists(output_directory)) {
@@ -246,27 +243,6 @@ threshold_optimization <- function(distance, threshold_resolution=0.001, output_
   }
   
   return(output)
-#   #Get output file path
-#   taxon_name <- as.character(taxon$name)
-#   file_name <- paste(c(taxonomy_levels[taxon$level], '_', 
-#                        taxon_name,
-#                        '_', as.character(taxon$id),'.txt'), collapse="") 
-#   sub_directory <- file.path(output_directory, 'threshold_optimization', fsep = .Platform$file.sep)
-#   file_path <- file.path(sub_directory, file_name, fsep = .Platform$file.sep)
-#   
-#   #prepare output directory
-#   if (!file.exists(sub_directory)) {
-#     dir.create(sub_directory, recursive=TRUE)
-#   }
-#   
-#   #write output data
-#   write.table(format(statistics, scientific = FALSE) , file=file_path, sep="\t", quote=FALSE, row.names=FALSE)
-#   return(list(threshold_optimization_file = file_path,
-#               threshold_optimization = statistics,
-#               optimal_threshold = optimal_threshold, 
-#               optimal_false_negative = optimal_false_negative,
-#               optimal_false_positive = optimal_false_positive,
-#               optimal_error = optimal_error))
 }
 
 #apply functions to subsets of distance matrix for each taxon (CAN TAKE LONG TIME)

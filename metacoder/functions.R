@@ -172,6 +172,7 @@ taxon_info <- function(identifications, level_order, separator=';') {
   taxon_short_names <- sapply(1:length(taxon_names), function(i) filter_taxonomy_string(taxon_names[i], taxon_level[i], taxon_level[i], level_order))
   taxon_short_names <- sub("^.*__", "", taxon_short_names)
   data.frame(row.names=taxon_names, 
+             id=1:length(taxon_names),
              level=taxon_level, 
              name=taxon_short_names, 
              count=counts)
