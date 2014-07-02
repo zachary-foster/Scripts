@@ -173,7 +173,7 @@ next_incremental_file_number <-function(directory) {
   max(current_numbers) + 1
 }
 
-remove_na_rows <- function(input) {
+remove_all_na_rows <- function(input) {
   na_rows <- sapply(1:nrow(input), function(x) sum(!is.na(input[x,])) != 0)
   input[na_rows, ]
 }

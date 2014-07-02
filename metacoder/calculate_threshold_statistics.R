@@ -31,7 +31,9 @@ taxon_statistics_output_path =  file.path(output_directory, taxon_statistics_out
 #load and format distance matrix (CAN TAKE LONG TIME)
 distance_matrix = as.matrix(read.csv(distance_matrix_file, sep="\t", row.names=1, header=FALSE))
 distance_matrix_names = row.names(distance_matrix)
-distance_matrix_taxonomy = sapply(strsplit(distance_matrix_names, split='|', fixed=TRUE), function(x) x[3])
+distance_matrix_taxonomy <- sapply(strsplit(distance_matrix_names, split='|', fixed=TRUE), function(x) x[3])
+row.names(distance_matrix) <- distance_matrix_taxonomy
+colnames(distance_matrix) <- distance_matrix_taxonomy
 
 #If the metric is similarity (ie 1=same instead of 0), convert to distance
 if (distance_matrix[1,1] == 1) {
@@ -290,7 +292,7 @@ taxon_statistics <- fapply(taxonomy_data, functions_to_apply,
 
 #Remove rows that are all NA 
 if (remove_na_rows) {
-  taxon_statistics <- remove_na_rows(taxon_statistics)                          
+  taxon_statistics <- remove_all_na_rows(taxon_statistics)                          
 }
 
                                            
