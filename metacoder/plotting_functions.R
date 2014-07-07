@@ -258,3 +258,22 @@ plot_value_tree <- function(graph, values, labels=NA, scaling=1, exclude=c(), ro
   }
   return(plot)
 }
+
+plot_value_distribution_by_level <- function(taxon_data, value_column, level_column = "level") {
+  ggplot(taxon_data, aes_string(x=level_column, y=value_column)) + 
+    geom_boxplot(width=.5, outlier.colour="transparent") +
+    geom_violin(alpha=.4, aes_string(fill=level_column,  colour = level_column)) + 
+    geom_point(position = position_jitter(w = 0.1, h = 0), alpha = .2) + 
+    facet_grid(~ clustering_level, scales = "free_x", space="free_x")  +
+    labs(title="Clustering level", y="Error rate", x="Taxon level") +
+    theme(title=element_text(size=17),
+          axis.text.y=element_text(size=12),
+          axis.text.x=element_text(size=12, angle = 60, hjust = 1),
+          axis.title=element_text(size=20),
+          legend.position="none",
+          panel.background=element_blank(),
+          panel.grid.major=element_blank(),
+          panel.grid.minor=element_blank(),
+          plot.background=element_blank(),
+          strip.text.x = element_text(size = 12))
+}
