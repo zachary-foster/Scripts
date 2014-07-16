@@ -1,10 +1,9 @@
 source("functions.R")
+source("constants.R")
 
 #Parameters
 distance_matrix_file = "/home/local/USDA-ARS/fosterz/Repositories/Analysis/taxon_specific_barcode_gap/rdp_fungi_28s_1/distance_matrix_pid.txt"
 output_directory = "/home/local/USDA-ARS/fosterz/Repositories/Analysis/taxon_specific_barcode_gap/rdp_fungi_28s_1/pid"
-taxonomy_levels = c(k='Kingdom', d='Domain', p='Phylum', c='Class', sc='Subclass', o='Order', so='Suborder', f='Family', g='Genus', s='Species', i='Individual')
-clustering_levels = c('s', 'g', 'f', 'o', 'c')
 
 #load and format distance matrix (CAN TAKE LONG TIME)
 distance_matrix = as.matrix(read.csv(distance_matrix_file, sep="\t", row.names=1, header=FALSE))

@@ -11,6 +11,7 @@ library(xtable)
 library(plyr)
 library(plotrix)
 library(zoo)
+library(stringr)
 
 
 source('internal_functions.R')

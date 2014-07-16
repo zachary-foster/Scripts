@@ -1,13 +1,12 @@
 source("functions.R")
+source("constants.R")
 
-#Constants
-taxonomy_levels = c(k='Kingdom', d='Domain', p='Phylum', c='Class', sc='Subclass', o='Order', so='Suborder', f='Family', g='Genus', s='Species', i='Individual')
-taxonomy_separator = ';'
 plot_directory_name =  "figures"
 
 #Parameters
 threshold_statistics_file = ""
 root_directory = "/home/local/USDA-ARS/fosterz/Repositories/Analysis/taxon_specific_barcode_gap/rdp_fungi_28s_1"
+taxon_data_folder <- "/home/local/USDA-ARS/fosterz/Repositories/Analysis/taxon_specific_barcode_gap/rdp_fungi_28s_1/pid"
 level_to_analyze = 'f'
 distance_type = 'PID'
 tree_plot_width = 18000
@@ -43,18 +42,47 @@ error_value_tree_path = file.path(plot_directory, error_value_tree_name, fsep = 
 thresh_vs_error_plot_name = paste('threshold_vs_error', '_', output_directory_name, '.png', sep='')
 thresh_vs_error_plot_path = file.path(plot_directory, thresh_vs_error_plot_name, fsep = .Platform$file.sep)
 
-#construct taxonomy graph
-taxonomy_graph <- graph.edgelist(taxon_edge_list(row.names(taxonomy_data)[2:nrow(taxonomy_data)], taxonomy_separator))
-taxon_root <- V(taxonomy_graph)[1]
 
-#common graph attributes
-taxa_to_exclude <- which(taxonomy_data$level >= level_to_analyze |
-                           taxonomy_data$subtaxon_count < 2 |
-                           # is.na(taxonomy_data$distance_graph) |
-                           taxonomy_data$count < 30)
+#Load taxon data 
+taxon_data_files <- list.files(taxon_data_folder, pattern="taxon_statistics.+txt", full.names=TRUE)
+taxon_data <- lapply(taxon_data_files, read.csv, sep="\t", row.names=1)
+taxon_data_levels <- sub("taxon_statistics_.+_(.+).txt", "\\1", basename(taxon_data_files), perl=TRUE)
+# taxon_data_levels <- taxon_data_levels[order(match(taxon_data_levels, taxonomy_levels))]
+taxon_data_levels <- ordered(taxon_data_levels, taxonomy_levels)
+names(taxon_data) <- taxon_data_levels
+
+#reformat into single data frame
+for (i in 1:length(taxon_data)) {
+  taxon_data[[i]]$taxon <- rownames(taxon_data[[i]])
+}
+taxon_data <- ldply(taxon_data, rbind, .id="clustering_level")
+
+# #construct taxonomy graph
+# taxonomy_graph <- graph.edgelist(taxon_edge_list(row.names(taxonomy_data)[2:nrow(taxonomy_data)], taxonomy_separator))
+# taxon_root <- V(taxonomy_graph)[1]
 
 #rename levels for graphing
-taxonomy_data$level <- ordered(taxonomy_data$level, levels=names(taxonomy_levels), labels=taxonomy_levels)
+# for (i in 1:length(taxon_data)) {
+#   taxon_data[[i]]$level <- ordered(taxon_data[[i]]$level, levels=names(taxonomy_levels), labels=taxonomy_levels)
+#   
+# }
+taxon_data$level <- ordered(taxon_data$level, levels=names(taxonomy_levels), labels=taxonomy_levels)
+taxon_data$clustering_level <- ordered(taxon_data$clustering_level, levels=taxonomy_levels, labels=taxonomy_levels)
+
+#common graph attributes
+# taxa_to_exclude <- lapply(1:length(taxon_data), function(i) 
+#   which(taxon_data[[i]]$level >= names(taxon_data)[[i]] |
+#           taxon_data[[i]]$subtaxon_count < 2 |
+#           taxon_data[[i]]$count < 30))
+# for (i in 1:length(taxon_data)) {
+#   taxon_data[[i]] <- taxon_data[[i]][-taxa_to_exclude[[i]],]
+# }
+taxa_to_exclude <- which(taxon_data$level >= taxon_data$clustering_level |
+                           taxon_data$subtaxon_count < 2 |
+                           # is.na(taxon_data$distance_graph) |
+                           taxon_data$count < 30 |
+                           !complete.cases(taxon_data))
+taxon_data <- taxon_data[-taxa_to_exclude,]
 
 
 #boxplot of optimal error rates
@@ -187,3 +215,38 @@ ggplot(data=taxonomy_data[-taxa_to_exclude, ], aes(optimal_threshold, optimal_er
         legend.background = element_rect(fill = '#00000000'))
 
 dev.off()
+
+
+
+
+
+for (my_level in unique(taxon_data$clustering_level)) {
+  if (length(taxon_data$taxon[taxon_data$clustering_level==my_level]) > 1) {
+    output_name <- paste("threshold_value_tree_", as.character(my_level), '.png', sep='')
+    output_path <- file.path(taxon_data_folder, output_name)
+    print(output_name)
+    plot_value_tree(taxon_data$taxon[taxon_data$clustering_level==my_level], 
+                    taxon_data$optimal_threshold[taxon_data$clustering_level==my_level],
+                    scaling= taxon_data$subsampled_count[taxon_data$clustering_level==my_level], 
+                    value_range=c(0.03, 0.97),
+                    labels=TRUE, 
+                    label_color='#AAAAAA', 
+                    save=output_path)    
+  }
+}
+
+for (my_level in unique(taxon_data$clustering_level)) {
+  if (length(taxon_data$taxon[taxon_data$clustering_level==my_level]) > 1) {
+    output_name <- paste("error_value_tree_", as.character(my_level), '.png', sep='')
+    output_path <- file.path(taxon_data_folder, output_name)
+    print(output_name)
+    plot_value_tree(taxon_data$taxon[taxon_data$clustering_level==my_level], 
+                    taxon_data$optimal_error[taxon_data$clustering_level==my_level],
+                    scaling= taxon_data$subsampled_count[taxon_data$clustering_level==my_level], 
+                    value_range=c(0.03, 0.97),
+                    labels=TRUE, 
+                    label_color='#AAAAAA', 
+                    save=output_path)    
+  }
+}
+

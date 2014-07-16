@@ -1,5 +1,5 @@
 source('internal_plotting_functions.R')
-
+source("constants.R")
 
 plot_threshold_optimization <- function(input, title=NULL, save_png=NULL, display=FALSE, background="transparent") {
   if (class(input) == "character" || class(input) == "factor" ) {
@@ -127,7 +127,7 @@ plot_distance_distribution <- function(input, title=NULL, save_png=NULL, display
 }
 
 
-plot_image_tree <- function(graph, image_file_paths, labels=NA, scaling=1, exclude=c(), root_index=1, label_color = "black", display=FALSE) {
+plot_image_tree <- function(graph, image_file_paths, labels=NA, scaling=1, exclude=c(), root_index=1, label_color = "black") {
   #store the distance of all verticies and edges from the root
   root <- V(graph)[root_index]
   vertex_depth <- sapply(get.shortest.paths(graph, from=root)$vpath, length)
@@ -176,7 +176,14 @@ plot_image_tree <- function(graph, image_file_paths, labels=NA, scaling=1, exclu
   return(plot)
 }
 
-plot_value_tree <- function(graph, values, labels=NA, scaling=1, exclude=c(), root_index=1, label_color = "black", display=FALSE, fade=FALSE, legend_text="", value_range=c(0,1), highlight_outliers=TRUE, background="#00000000") {
+plot_value_tree <- function(graph, values, labels=NA, scaling=1, exclude=c(), root_index=1, label_color = "black", display=FALSE, fade=FALSE, legend_text="", value_range=c(0,1), highlight_outliers=TRUE, background="#00000000", save=NULL) {
+  #make graph if nessesary
+  if (class(graph) == "character") {
+    graph <- graph.edgelist(taxon_edge_list(graph, taxonomy_separator))
+  } else if (class(graph) != "igraph") {
+    stop("Incorrect input. 'graph' must be an igraph object or a list of taxonomy strings.")
+  } 
+  
   #store the distance of all verticies and edges from the root
   root <- V(graph)[root_index]
   vertex_depth <- sapply(get.shortest.paths(graph, from=root)$vpath, length)
@@ -233,6 +240,9 @@ plot_value_tree <- function(graph, values, labels=NA, scaling=1, exclude=c(), ro
   #Load vertex images 
   V(graph)$raster <- lapply(as.character(V(graph)$raster_file), readPNG)
   
+  if (!is.null(save)) {
+    png(file = save, bg = background, width=5000, height=5000)
+  }
   #plot graph
   my_plot <- plot(graph,
                   layout=graph_layout,
@@ -253,19 +263,19 @@ plot_value_tree <- function(graph, values, labels=NA, scaling=1, exclude=c(), ro
   pushViewport(viewport(x=0.9, y=0.15))
   grid.draw(legend)
   
-  if (display) {
-    print(my_plot)
+  if (!is.null(save)) {
+    dev.off()
   }
-  return(plot)
+  return(my_plot)
 }
 
-plot_value_distribution_by_level <- function(taxon_data, value_column, level_column = "level") {
+plot_value_distribution_by_level <- function(taxon_data, value_column, level_column = "level", ...) {
   ggplot(taxon_data, aes_string(x=level_column, y=value_column)) + 
     geom_boxplot(width=.5, outlier.colour="transparent") +
     geom_violin(alpha=.4, aes_string(fill=level_column,  colour = level_column)) + 
     geom_point(position = position_jitter(w = 0.1, h = 0), alpha = .2) + 
     facet_grid(~ clustering_level, scales = "free_x", space="free_x")  +
-    labs(title="Clustering level", y="Error rate", x="Taxon level") +
+    labs(...) +
     theme(title=element_text(size=17),
           axis.text.y=element_text(size=12),
           axis.text.x=element_text(size=12, angle = 60, hjust = 1),
