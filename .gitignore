@@ -1,3 +1,6 @@
 *.py~
 *.pyc
 .Rproj.user
+*.RData
+*.Rhistory
+*~
