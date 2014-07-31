@@ -1,40 +1,55 @@
 #Change log
-version = '0.0.1'
-change_log = [('0.0.1',  'First version of the script')]
+change_log = [('0.0.1',  'First version of the script'),
+	('0.1.0', 'Added logging; now using scp and tar instead of rsync')]
+version = change_log[-1][0]
 
-#Imports
+#Generic Imports
 import os, sys, time
 
-#Constants
-port = 732
-user = 'fosterz'
-server = 'oomy.cgrb.oregonstate.edu'
-mysql_user = 'PhytoUser'
-mysql_password = '1nf3st4ns'
-target_directory = '/home/local/USDA-ARS/fosterz/website_backups/grunwald_lab'
-source_directory = '/data/www/grunwaldlab/drupal'
-mysql_name = 'grunwald_Drupal'
-remote_temporary_directory = '/export/mysql_dump'
-number_of_backups_to_keep = 10
+#Specific imports
+import subprocess
+import logging
+from backup_website_constants import *
 
 #Parameters
-archive_name = 'grunwald_lab_website_backup'
-mysqldump_result_file = '%s_dump.sql' % (os.path.join(remote_temporary_directory, mysql_name))
-target_path = os.path.join(target_directory, archive_name)
+ssh_command_prefix = ['ssh', '-p', str(port), '%s@%s' % (user, server)]
+
+#logging settings
+logging.basicConfig(filename=log_path, level=logging.INFO, format='%(asctime)s: %(message)s')
 
 #Dump MySQL database
-mysqldump_command = "ssh -p %d %s@%s 'mysqldump --user=%s --password=%s --result-file=%s %s'" %\
-					 (port, user, server, mysql_user, mysql_password, mysqldump_result_file, mysql_name)
-print(mysqldump_command)
-mysqldump_return_code = os.system(mysqldump_command)
-					 
-#Copy the dumped database to the local computer
-rsync_dump_command = "rsync -aczL --rsh='ssh -p %s' %s@%s:%s %s" % (port, user, server, mysqldump_result_file, target_path + '/')
-print(rsync_dump_command)
-rsync_dump_return_code = os.system(rsync_dump_command)
+mysqldump_command = "'mysqldump --user=%s --password=%s --result-file=%s %s'" % \
+	(mysql_user, mysql_password, mysqldump_result_file, mysql_name)
+mysqldump_command = ' '.join(ssh_command_prefix + [mysqldump_command])
+logging.info("Dumping mysql database:\n   %s" % str(mysqldump_command))
+mysqldump_command_output = os.system(mysqldump_command)
+logging.info("Dumping mysql database complete.")
 
-#Copy the drupal directory to the local computer
-rsync_drupal_command = "rsync -aczL --rsh='ssh -p %s' %s@%s:%s %s" % (port, user, server, source_directory, target_path + '/')
-print(rsync_drupal_command)
-rsync_drupal_return_code = os.system(rsync_drupal_command)
+#Make compressed copy of drupal site
+compress_command = "'tar -cpz -f %s -C %s %s'" % (compressed_file_path, source_directory, drupal_directory)
+compress_command = ' '.join(ssh_command_prefix + [compress_command])
+logging.info('Compressing drupal site directory:\n   %s' % str(compress_command))
+compress_command_output = os.system(compress_command)
+logging.info("Compressing drupal site directory complete.")
+
+#Make local target directory if it does not exist
+if os.path.exists(target_path) is False:
+	os.mkdir(target_path)
+
+#Copy the dumped database to the local computer
+#download_dump_command = ['rsync', '-W', '--rsh', "'ssh -p %d'" % port, '%s@%s:%s' % (user, server, mysqldump_result_file), target_path + '/']
+download_dump_command = ['scp', "-P", str(port), '%s@%s:%s' % (user, server, mysqldump_result_file), target_path + '/']
+download_dump_command = ' '.join(download_dump_command)
+logging.info("Downloading mysql dump:\n   %s" % str(download_dump_command))
+download_dump_output = os.system(download_dump_command)
+logging.info("Downloading mysql dump complete.")
+
+#Copy the compressed drupal directory to the local computer
+#download_drupal_command = ['rsync', '-W', '--rsh', "'ssh -p %d'" % port, '%s@%s:%s' % (user, server, compressed_file_path), target_path + '/']
+download_drupal_command = ['scp', "-P", str(port), '%s@%s:%s' % (user, server, compressed_file_path), target_path + '/']
+download_drupal_command = ' '.join(download_drupal_command)
+logging.info("Downloading compressed drupal site:\n   %s" % str(download_drupal_command))
+download_drupal_output = os.system(download_drupal_command)
+logging.info("Downloading compressed drupal site complete.")
+
 
