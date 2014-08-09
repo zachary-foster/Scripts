@@ -33,20 +33,37 @@ compress_command_output = os.system(compress_command)
 logging.info("Compressing drupal site directory complete.")
 
 #Make local target directory if it does not exist
-if os.path.exists(target_path) is False:
-	os.mkdir(target_path)
+#if os.path.exists(target_path) is False:
+#	os.mkdir(target_path)
+
+#delete local most recent backup
+#shutil.rmtree(target_path)
+#
+def diehard_rsync(command, max_attempts=10):
+	"""Retry an rsync command until it completes successfully.
+
+	Arguments:
+	command -- the rsync command to try as a list
+	max_attempts -- the maximum number of times the command will be attempted before giving up. (default 10)
+	"""
+	logging.info("Downloading mysql dump:\n   %s" % str(download_dump_command))
+	first_return_code = subprocess.call(rsync_command)
+	if first_return_code != 0:
+		
+		if "--partial" not in rsync_command:
+			rsync_command.append("--partial")
+	
 
 #Copy the dumped database to the local computer
-#download_dump_command = ['rsync', '-W', '--rsh', "'ssh -p %d'" % port, '%s@%s:%s' % (user, server, mysqldump_result_file), target_path + '/']
-download_dump_command = ['scp', "-P", str(port), '%s@%s:%s' % (user, server, mysqldump_result_file), target_path + '/']
+download_dump_command = ['rsync', '--rsh', "'ssh -p %d'" % port, '%s@%s:%s' % (user, server, mysqldump_result_file), target_path + '/']
+#download_dump_command = ['scp', "-P", str(port), '%s@%s:%s' % (user, server, mysqldump_result_file), target_path + '/']
 download_dump_command = ' '.join(download_dump_command)
-logging.info("Downloading mysql dump:\n   %s" % str(download_dump_command))
 download_dump_output = os.system(download_dump_command)
 logging.info("Downloading mysql dump complete.")
 
 #Copy the compressed drupal directory to the local computer
-#download_drupal_command = ['rsync', '-W', '--rsh', "'ssh -p %d'" % port, '%s@%s:%s' % (user, server, compressed_file_path), target_path + '/']
-download_drupal_command = ['scp', "-P", str(port), '%s@%s:%s' % (user, server, compressed_file_path), target_path + '/']
+download_drupal_command = ['rsync', '--rsh', "'ssh -p %d'" % port, '%s@%s:%s' % (user, server, compressed_file_path), target_path + '/']
+#download_drupal_command = ['scp', "-P", str(port), '%s@%s:%s' % (user, server, compressed_file_path), target_path + '/']
 download_drupal_command = ' '.join(download_drupal_command)
 logging.info("Downloading compressed drupal site:\n   %s" % str(download_drupal_command))
 download_drupal_output = os.system(download_drupal_command)

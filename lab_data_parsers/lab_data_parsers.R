@@ -118,22 +118,40 @@ volume_for_dilution_table <- function(initial_conc, final_volume, final_conc = m
   return(output_table)
 }
 
-pcr_table <- function(count, dna_volume) {
+pcr_table <- function(count, additives=c(DNA=1), additive_concentration=rep('', length(additives))) {
   if (!require(knitr)) {
     stop("install package knitr")
   }
-  data <- data.frame(Component=c("Water", "10x Buffer", "dNTP", "Primer 1", "Primer 2", "Taq", "DNA"),
-                     Concentration=c("", "", "10mM", "10uM", "10uM", "", ""),
-                     Single=c(19.75 - dna_volume, 2.5, .5, 1, 1, .25, dna_volume),
+  master_mix_volume = 19.75 - sum(additives)
+  data <- data.frame(Component=c("Water", "10x Buffer", "dNTP", "Primer 1", "Primer 2", "Taq", names(additives)),
+                     Concentration=c("", "", "10mM", "10uM", "10uM", "", additive_concentration),
+                     Single=c(master_mix_volume, 2.5, .5, 1, 1, .25, additives),
                      stringsAsFactors=FALSE)
   data$Total <- data$Single * count
   data$Safe <- data$Total * 1.1
-  data[data$Component == "DNA", c("Total", "Safe")] = 0
+  data[data$Component %in% names(additives), c("Total", "Safe")] = 0
   data <- rbind(data, c(Component="Total", Concentration="", Single=sum(data$Single), Total=sum(data$Total), Safe=sum(data$Safe)))
   
   writeLines(paste("PCR ingredients for ", count, ", ", data$Single[nrow(data)], "ul reactions:", sep=""))
   writeLines("")
   
   kable(data, format = "markdown", )
+  return(data)
+}
+
+serial_dilution_table <- function(range, count, volume = 100) {
+  base <- 10
+  dilution_exp <- diff(log(range, base)) / (count) #exponent to raise for each dilution
+  dilution_factor <- base^dilution_exp
+  each_addition <-  dilution_factor * range[1] * volume / (range[1] - dilution_factor * range[1])
+  data <- data.frame(N=0:count, Dilution = base^(dilution_exp * 0:(count)))
+  data$Concentration = data$Dilution * range[1]
+  
+  writeLines(paste("**Serial dilution table**\nFor each dilution, dilute ", 
+                   signif(each_addition, 4),
+                   " of the previous sample in ",
+                   signif(volume, 4),
+                   " of solvent:\n", sep=""))
+  kable(data, format = "markdown")
   return(data)
 }
