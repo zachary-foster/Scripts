@@ -39,20 +39,38 @@ logging.info("Compressing drupal site directory complete.")
 #delete local most recent backup
 #shutil.rmtree(target_path)
 #
-def diehard_rsync(command, max_attempts=10):
+def diehard_rsync(command, max_attempts=10, delay=30):
 	"""Retry an rsync command until it completes successfully.
 
 	Arguments:
 	command -- the rsync command to try as a list
-	max_attempts -- the maximum number of times the command will be attempted before giving up. (default 10)
+	max_attempts -- the maximum number of times the command will be attempted before giving up. (default: 10)
+	delay -- the time to pause between attempts in seconds. (default: 30)
 	"""
-	logging.info("Downloading mysql dump:\n   %s" % str(download_dump_command))
-	first_return_code = subprocess.call(rsync_command)
+	attempts = 0
+	logging.info("Attempting the following Rsync command at most %s times:\n   %s" % (max_attempts, ' '.join(command)))
+	first_return_code = subprocess.call(command)
+	attempts += 1
 	if first_return_code != 0:
-		
-		if "--partial" not in rsync_command:
-			rsync_command.append("--partial")
-	
+		if "--partial" not in command:
+			command.append("--partial")
+		while attempts < max_attempts:
+			time.sleep(delay)
+			logging.debug("Trying again...")
+			return_code = subprocess.call(command)
+			attempts += 1
+			if return_code == 0:
+				logging.debug("Attempt %s succeded." % attempts)
+				return return_code
+			else:
+				logging.debug("Attempt %s failed with return code %d." % (attempts, return_code))
+		else: #if too many attempts
+			error_message = "The following Rsync command failed after %d attempts with return code %d:\n   %s" %\
+				(attempts, return_code,' '.join(command))
+			logging.error(error_message)
+			raise RuntimeError(error_message)
+	else:
+		return first_return_code
 
 #Copy the dumped database to the local computer
 download_dump_command = ['rsync', '--rsh', "'ssh -p %d'" % port, '%s@%s:%s' % (user, server, mysqldump_result_file), target_path + '/']
