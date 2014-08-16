@@ -47,12 +47,22 @@ def diehard_rsync(command, max_attempts=10, delay=30):
 	max_attempts -- the maximum number of times the command will be attempted before giving up. (default: 10)
 	delay -- the time to pause between attempts in seconds. (default: 30)
 	"""
+	def success(return_code, attempt):
+		logging.debug("Attempt %s succeded." % attempts)
+		return return_code
+	def failure(return_code, attempt):
+		error_message = "The following Rsync command failed after %d attempts with return code %d:\n   %s" %\
+			(attempts, return_code, command)
+		logging.error(error_message)
+		raise RuntimeError(error_message)
 	attempts = 0
-	logging.info("Attempting the following Rsync command at most %s times:\n   %s" % (max_attempts, ' '.join(command)))
+	logging.info("Attempting the following Rsync command (max tries = %d):\n   %s" % (max_attempts, command))
 	first_return_code = subprocess.call(command)
 	attempts += 1
 	if first_return_code != 0:
+		logging.debug('First attempt failed.')
 		if "--partial" not in command:
+			logging.debug('Appending --partial option to rsync command.')
 			command.append("--partial")
 		while attempts < max_attempts:
 			time.sleep(delay)
@@ -60,31 +70,20 @@ def diehard_rsync(command, max_attempts=10, delay=30):
 			return_code = subprocess.call(command)
 			attempts += 1
 			if return_code == 0:
-				logging.debug("Attempt %s succeded." % attempts)
-				return return_code
+				return success(return_code, attempts)
 			else:
 				logging.debug("Attempt %s failed with return code %d." % (attempts, return_code))
 		else: #if too many attempts
-			error_message = "The following Rsync command failed after %d attempts with return code %d:\n   %s" %\
-				(attempts, return_code,' '.join(command))
-			logging.error(error_message)
-			raise RuntimeError(error_message)
+			return failure(return_code, attempts)
 	else:
-		return first_return_code
+		return success(first_return_code, attempts)
 
 #Copy the dumped database to the local computer
 download_dump_command = ['rsync', '--rsh', "'ssh -p %d'" % port, '%s@%s:%s' % (user, server, mysqldump_result_file), target_path + '/']
-#download_dump_command = ['scp', "-P", str(port), '%s@%s:%s' % (user, server, mysqldump_result_file), target_path + '/']
-download_dump_command = ' '.join(download_dump_command)
-download_dump_output = os.system(download_dump_command)
-logging.info("Downloading mysql dump complete.")
+download_dump_output = diehard_rsync(download_dump_command)
 
 #Copy the compressed drupal directory to the local computer
 download_drupal_command = ['rsync', '--rsh', "'ssh -p %d'" % port, '%s@%s:%s' % (user, server, compressed_file_path), target_path + '/']
-#download_drupal_command = ['scp', "-P", str(port), '%s@%s:%s' % (user, server, compressed_file_path), target_path + '/']
-download_drupal_command = ' '.join(download_drupal_command)
-logging.info("Downloading compressed drupal site:\n   %s" % str(download_drupal_command))
-download_drupal_output = os.system(download_drupal_command)
-logging.info("Downloading compressed drupal site complete.")
+download_drupal_output = diehard_rsync(download_drupal_command)
 
 
