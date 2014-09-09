@@ -410,35 +410,113 @@ calculate_barcode_statistics <- function(distance_matrix, taxonomy_levels,
   return(taxon_statistics)
 }
 
-
+#===================================================================================================
 #' Queries sequences for a given taxon
 #'
-#' Queries sequences for a given taxon.
+#' Produces a sequinr query object that can be used to download sequences. 
+#' @param query_id A character vector of length 1 specifying the variable name the query will be bound to.
 #' @param taxon A character vector of taxa. Specifing multiple taxa is equivalent to 
 #'    running the command multiple times with each taxa and concatenating the results. 
 #' @param key A character vector of keywords. All keywords must be present for a given
-#'    sequence to be returned
+#'    sequence to be returned.
 #' @param type The type of the sequence to return (e.g. RRNA). Use `getType()` to see options. 
-#' @param ... Extra arguments 
 #' @keywords 
 #' @export
 #' @importFrom seqinr query
 #' @example
 #' choosebank("genbank")
-#' my_test <- query_taxon("test", c("phytophthora", "pythium"), c("@18S@", "@28S@"), "RRNA")
+#' query_taxon("test", c("phytophthora", "pythium"), c("@18S@", "@28S@"), "RRNA")
+#' str(test)
 #' closebank()
-query_taxon <- function(query_id, taxon, key, type)   {
+query_taxon <- function(query_id, taxon, key = character(0), type)   {
+  
   single_query <- function(query_id, taxon, key) {
     query("single_query", paste('sp=', taxon, sep=''), virtual=TRUE)
-    names(key) <- paste("key_query", 1:length(key), sep="_")
+    if (length(key) >= 1) names(key) <- paste("key_query", seq_along(key), sep="_")
     for (item in names(key)) {
       query(item, paste('single_query AND T=', type, ' AND K=', key[item], sep=""), virtual=TRUE)
       query(item, paste("PAR", item), virtual=TRUE) # Replace by parent sequences
     }
     return(query(query_id, paste(names(key), collapse=" AND "), virtual=TRUE))
   }
-  queries <- mapply(single_query, paste("taxon_query", 1:length(taxon), sep="_"), taxon, key)
-  browser()
+  
+  queries <- mapply(single_query, paste("taxon_query", seq_along(taxon), sep="_"), taxon, key)
   query_names <- apply(queries, MARGIN=2, function(x) x$name)
-  return(query(query_id, paste(query_names, collapse=" OR ")))
+  query(query_id, paste(query_names, collapse=" OR "))
+}
+
+
+#===================================================================================================
+#' Extract the binomial organism name from genbank annotations.
+#' @importFrom stringr str_match
+extract_organism <- function(annotation) {
+  index <- vapply(annotation, grep, FUN.VALUE=numeric(1), pattern="^SOURCE")
+  value <- mapply(`[`, annotation, index)
+  str_match(value, "^SOURCE[ \t]+(.+)$")[, 2]
+}
+
+#===================================================================================================
+#' Extract the description from genbank annotations.
+#' @importFrom stringr str_match
+extract_description <- function(annotation) {
+  annotation <- vapply(annotation, paste, character(1), collapse="\n")
+  result <- str_match(annotation, "DEFINITION[ \t]+(.+)ACCESSION[ \t]")[, 2]
+  gsub("[ \t]+", " ", result)
+}
+
+
+
+
+#' Download the sequences from an sequinr query object and formats them with their annotations
+#' @importFrom seqinr choosebank closebank getSequence getAnnot
+download_gb_query <- function(query_req) {
+  choosebank("genbank")
+  on.exit(closebank())
+  sequence <- getSequence(query_req)
+  annotation <- getAnnot(query_req)
+  names(sequence) <- extract_organism(annotation)
+  attr(sequence, "annotation") <- annotation
+  sequence
+}
+
+
+#===================================================================================================
+query_req_to_dataframe <- function(query_req) {
+  data.frame(length = vapply(query_req, attr, numeric(1), "length"),
+             frame = vapply(query_req, attr, numeric(1), "frame"),
+             name = as.character(query_req),
+             stringsAsFactors = FALSE)
+}
+
+
+#===================================================================================================
+download_gb_taxon <- function(taxon, key, type,
+                              seq_length = c(1,10000),
+                              max_count = 10000,
+                              subsample = c("random", "head", "tail"),
+                              standardize_name = TRUE,
+                              standardize_tax = TRUE) {
+  # Verify arguments -------------------------------------------------------------------------------
+  subsample <- match.args(subsample)
+  stopifnot(length(seq_length) == 2, seq_length[1] <= seq_length[2])
+  # Search for potential sequences -----------------------------------------------------------------
+  query_taxon("taxon_query", taxon, key, type)
+  results <- query_req_to_dataframe(taxon_query$req)
+  results$index <- 1:nrow(results)
+  # Filter by sequence length ----------------------------------------------------------------------
+  results <- results[results$length < seq_length[1] | results$length > seq_length[2], ]
+  # Subsample if necessary -------------------------------------------------------------------------
+  max_count <- min(nrow(results), max_count)
+  switch(subsample,
+         "random" = results[sample(1:nrow(results), max_count), ],
+         "head"   = head(results, max_count), 
+         "tail"   = tail(results, max_count))
+  # Download sequences -----------------------------------------------------------------------------
+  sequences <- ncbi_getbyid(rownames(results), verbose=FALSE)
+  # Standardize binomial names ---------------------------------------------------------------------
+  if (standardize_name) {
+    
+  }
+  # Standardize taxonomy ---------------------------------------------------------------------------
+  results <- 
 }
