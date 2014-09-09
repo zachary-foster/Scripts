@@ -410,3 +410,35 @@ calculate_barcode_statistics <- function(distance_matrix, taxonomy_levels,
   return(taxon_statistics)
 }
 
+
+#' Queries sequences for a given taxon
+#'
+#' Queries sequences for a given taxon.
+#' @param taxon A character vector of taxa. Specifing multiple taxa is equivalent to 
+#'    running the command multiple times with each taxa and concatenating the results. 
+#' @param key A character vector of keywords. All keywords must be present for a given
+#'    sequence to be returned
+#' @param type The type of the sequence to return (e.g. RRNA). Use `getType()` to see options. 
+#' @param ... Extra arguments 
+#' @keywords 
+#' @export
+#' @importFrom seqinr query
+#' @example
+#' choosebank("genbank")
+#' my_test <- query_taxon("test", c("phytophthora", "pythium"), c("@18S@", "@28S@"), "RRNA")
+#' closebank()
+query_taxon <- function(query_id, taxon, key, type)   {
+  single_query <- function(query_id, taxon, key) {
+    query("single_query", paste('sp=', taxon, sep=''), virtual=TRUE)
+    names(key) <- paste("key_query", 1:length(key), sep="_")
+    for (item in names(key)) {
+      query(item, paste('single_query AND T=', type, ' AND K=', key[item], sep=""), virtual=TRUE)
+      query(item, paste("PAR", item), virtual=TRUE) # Replace by parent sequences
+    }
+    return(query(query_id, paste(names(key), collapse=" AND "), virtual=TRUE))
+  }
+  queries <- mapply(single_query, paste("taxon_query", 1:length(taxon), sep="_"), taxon, key)
+  browser()
+  query_names <- apply(queries, MARGIN=2, function(x) x$name)
+  return(query(query_id, paste(query_names, collapse=" OR ")))
+}

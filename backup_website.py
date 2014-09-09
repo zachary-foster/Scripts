@@ -48,7 +48,7 @@ def diehard_rsync(command, max_attempts=10, delay=30):
 	delay -- the time to pause between attempts in seconds. (default: 30)
 	"""
 	def success(return_code, attempt):
-		logging.debug("Attempt %s succeded." % attempts)
+		logging.info("Attempt %s succeded." % attempts)
 		return return_code
 	def failure(return_code, attempt):
 		error_message = "The following Rsync command failed after %d attempts with return code %d:\n   %s" %\
@@ -79,11 +79,11 @@ def diehard_rsync(command, max_attempts=10, delay=30):
 		return success(first_return_code, attempts)
 
 #Copy the dumped database to the local computer
-download_dump_command = ['rsync', '--rsh', "'ssh -p %d'" % port, '%s@%s:%s' % (user, server, mysqldump_result_file), target_path + '/']
+download_dump_command = ['rsync', '--rsh', "ssh -p %d" % port, '%s@%s:%s' % (user, server, mysqldump_result_file), target_path + '/']
 download_dump_output = diehard_rsync(download_dump_command)
 
 #Copy the compressed drupal directory to the local computer
-download_drupal_command = ['rsync', '--rsh', "'ssh -p %d'" % port, '%s@%s:%s' % (user, server, compressed_file_path), target_path + '/']
+download_drupal_command = ['rsync', '--rsh', "ssh -p %d" % port, '%s@%s:%s' % (user, server, compressed_file_path), target_path + '/']
 download_drupal_output = diehard_rsync(download_drupal_command)
 
 
