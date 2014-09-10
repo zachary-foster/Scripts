@@ -420,14 +420,18 @@ calculate_barcode_statistics <- function(distance_matrix, taxonomy_levels,
 #' @param key A character vector of keywords. All keywords must be present for a given
 #'    sequence to be returned.
 #' @param type The type of the sequence to return (e.g. RRNA). Use `getType()` to see options. 
-#' @keywords 
-#' @export
-#' @importFrom seqinr query
+#' @return A instance of class seqinr::qaw, as returned by seqinr::query. 
+#' @details Based off a exercise in the seqinr vignette.
 #' @example
-#' choosebank("genbank")
-#' query_taxon("test", c("phytophthora", "pythium"), c("@18S@", "@28S@"), "RRNA")
-#' str(test)
-#' closebank()
+#'   \dontrun{
+#'     choosebank("genbank")
+#'     query_taxon("test", c("phytophthora", "pythium"), c("@18S@", "@28S@"), "RRNA")
+#'     str(test)
+#'     closebank()
+#'   }
+#' @seealso taxize::ncbi_getbyname seqinr::query
+#' @importFrom seqinr query
+#' @export
 query_taxon <- function(query_id, taxon, key = character(0), type)   {
   
   single_query <- function(query_id, taxon, key) {
@@ -448,6 +452,7 @@ query_taxon <- function(query_id, taxon, key = character(0), type)   {
 
 #===================================================================================================
 #' Extract the binomial organism name from genbank annotations.
+#' 
 #' @importFrom stringr str_match
 extract_organism <- function(annotation) {
   index <- vapply(annotation, grep, FUN.VALUE=numeric(1), pattern="^SOURCE")
@@ -458,6 +463,7 @@ extract_organism <- function(annotation) {
 
 #===================================================================================================
 #' Extract the description from genbank annotations.
+#' 
 #' @importFrom stringr str_match
 extract_description <- function(annotation) {
   annotation <- vapply(annotation, paste, character(1), collapse="")
@@ -468,6 +474,7 @@ extract_description <- function(annotation) {
 
 #===================================================================================================
 #' Extract the gi from genbank annotations.
+#' 
 #' @importFrom stringr str_match
 extract_gi <- function(annotation) {
   index <- vapply(annotation, grep, FUN.VALUE=numeric(1), pattern="^VERSION")
@@ -477,7 +484,7 @@ extract_gi <- function(annotation) {
 
 
 #===================================================================================================
-#' Download the sequences from an sequinr query object and formats them with their annotations
+#' Download the sequences from an seqinr query object and formats them with their annotations
 #' 
 #' Formats the output of `sequinr::getSequence` and `sequinr::getAnnot` to the output of 
 #' `taxize::ncbi_getbyid`.
@@ -485,6 +492,7 @@ extract_gi <- function(annotation) {
 #'    `x$req` element of the output.
 #' @return A data.frame in the format of the output of `taxize::ncbi_getbyid`.
 #' @importFrom seqinr choosebank closebank getSequence getAnnot
+#' @export
 download_gb_query <- function(query_req) {
   choosebank("genbank")
   on.exit(closebank())
@@ -502,6 +510,10 @@ download_gb_query <- function(query_req) {
 
 
 #===================================================================================================
+#' Converts a list of class seqinr::SeqAcnucWeb to a data.frame
+#' 
+#' @param query_req A list of class seqinr::SeqAcnucWeb
+#' @return A data frame with rows named after the sequence names and columns 'length' and 'frame'. 
 query_req_to_dataframe <- function(query_req) {
   data.frame(length = vapply(query_req, attr, numeric(1), "length"),
              frame = vapply(query_req, attr, numeric(1), "frame"),
@@ -511,9 +523,43 @@ query_req_to_dataframe <- function(query_req) {
 
 
 #===================================================================================================
+#' Downloads sequences that result from a taxon and keyword search
+#' 
+#' This function is meant to download sequences associated with a taxon and a set of keywords from
+#' Genbank using a simple interface. More complicated queries should be done using the tools of the
+#' `sequnir` and `taxize` packages, as this function does. 
+#' @param taxon A character vector of taxa.
+#' @param key A character vector of keywords. All keywords must be present for a given
+#'    sequence to be returned.
+#' @param type The type of the sequence to return (e.g. RRNA). Use `getType()` to see options. 
+#' @param seq_length A numeric vector of length 2. The range of sequence lengths to allow.
+#' @param max_count The maximum number of sequences to download. See note below for additional
+#'   considerations.
+#' @param subsample A character vector of length 1. Specifies how to subsample if more search 
+#'   results are found than `max_count`. "subsample": randomly select using `sample`; "head": use
+#'   first results; "tail": use last results.
+#' @param standardize If TRUE, validate binomial taxon names using `taxize`.
+#' @param use_acnuc If TRUE, sequences are downloaded using tools from `sequinr`. This is typically
+#'   slower. 
+#' @details This function first searches genbank via ACNUC and finds all sequences of a given taxon
+#'   with given keywords (e.g. genes). It then subsamples these search results if there are too many
+#'   and downloads the subsample sequences. The results are compiled into a data frame and
+#'   returned. 
+#' @note When `use_acnuc = FALSE`, some sequences that are found during searching with `seqinr` are
+#'   not found when downloading using `taxize`. This is because `seqinr::query` returns the ACNUC
+#'   id, which appears to be the genbank "locus" field, whereas `taxize::ncbi_getbyid` uses the
+#'   "accession" or "GI" field. Usually the "locus" and "accession" field are the same, but when 
+#'   they are differnt results of the search are not downloaded. Therefore the maximum count of 
+#'   sequences will not always be returned even if more than the maximum are found.
+#' @seealso download_gb_query query_taxon
+#' @examples
+#'   \dontrun{x <- download_gb_taxon(c("phytophthora", "pythium"), c("@18S@", "@28S@"), "RRNA")}
+#' @importFrom seqinr choosebank closebank 
+#' @importFrom taxize ncbi_getbyid gnr_resolve
+#' @export
 download_gb_taxon <- function(taxon, key, type,
                               seq_length = c(1,10000),
-                              max_count = 10000,
+                              max_count = 100,
                               subsample = c("random", "head", "tail"),
                               standardize = TRUE,
                               use_acnuc = FALSE) {
