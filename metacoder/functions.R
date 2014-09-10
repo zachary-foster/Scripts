@@ -455,28 +455,49 @@ extract_organism <- function(annotation) {
   str_match(value, "^SOURCE[ \t]+(.+)$")[, 2]
 }
 
+
 #===================================================================================================
 #' Extract the description from genbank annotations.
 #' @importFrom stringr str_match
 extract_description <- function(annotation) {
-  annotation <- vapply(annotation, paste, character(1), collapse="\n")
-  result <- str_match(annotation, "DEFINITION[ \t]+(.+)ACCESSION[ \t]")[, 2]
+  annotation <- vapply(annotation, paste, character(1), collapse="")
+  result <- str_match(annotation, "DEFINITION[ \t]+(.+)ACCESSION")[, 2]
   gsub("[ \t]+", " ", result)
 }
 
 
+#===================================================================================================
+#' Extract the gi from genbank annotations.
+#' @importFrom stringr str_match
+extract_gi <- function(annotation) {
+  index <- vapply(annotation, grep, FUN.VALUE=numeric(1), pattern="^VERSION")
+  value <- mapply(`[`, annotation, index)
+  str_match(value, "^VERSION[ \t]+.+GI:([0-9]+)$")[, 2]
+}
 
 
+#===================================================================================================
 #' Download the sequences from an sequinr query object and formats them with their annotations
+#' 
+#' Formats the output of `sequinr::getSequence` and `sequinr::getAnnot` to the output of 
+#' `taxize::ncbi_getbyid`.
+#' @param query_req A list of class `SeqAcnucWeb` (e.g. what `sequinr::query` produces in the
+#'    `x$req` element of the output.
+#' @return A data.frame in the format of the output of `taxize::ncbi_getbyid`.
 #' @importFrom seqinr choosebank closebank getSequence getAnnot
 download_gb_query <- function(query_req) {
   choosebank("genbank")
   on.exit(closebank())
   sequence <- getSequence(query_req)
   annotation <- getAnnot(query_req)
-  names(sequence) <- extract_organism(annotation)
-  attr(sequence, "annotation") <- annotation
-  sequence
+  sequence <- vapply(sequence, paste, character(1), collapse="")
+  sequence <- toupper(sequence)
+  data.frame(taxon = extract_organism(annotation),
+             gene_desc = extract_description(annotation),
+             gi_no = extract_gi(annotation),
+             acc_no = as.character(query_req),
+             length = vapply(sequence, nchar, numeric(1)),
+             sequence = sequence)
 }
 
 
@@ -484,7 +505,7 @@ download_gb_query <- function(query_req) {
 query_req_to_dataframe <- function(query_req) {
   data.frame(length = vapply(query_req, attr, numeric(1), "length"),
              frame = vapply(query_req, attr, numeric(1), "frame"),
-             name = as.character(query_req),
+             row.names = as.character(query_req),
              stringsAsFactors = FALSE)
 }
 
@@ -494,29 +515,39 @@ download_gb_taxon <- function(taxon, key, type,
                               seq_length = c(1,10000),
                               max_count = 10000,
                               subsample = c("random", "head", "tail"),
-                              standardize_name = TRUE,
-                              standardize_tax = TRUE) {
+                              standardize = TRUE,
+                              use_acnuc = FALSE) {
   # Verify arguments -------------------------------------------------------------------------------
-  subsample <- match.args(subsample)
+  subsample <- match.arg(subsample)
   stopifnot(length(seq_length) == 2, seq_length[1] <= seq_length[2])
   # Search for potential sequences -----------------------------------------------------------------
+  choosebank("genbank")
+  on.exit(closebank())
   query_taxon("taxon_query", taxon, key, type)
   results <- query_req_to_dataframe(taxon_query$req)
   results$index <- 1:nrow(results)
   # Filter by sequence length ----------------------------------------------------------------------
-  results <- results[results$length < seq_length[1] | results$length > seq_length[2], ]
+  results <- results[results$length >= seq_length[1] & results$length <= seq_length[2], ]
   # Subsample if necessary -------------------------------------------------------------------------
   max_count <- min(nrow(results), max_count)
-  switch(subsample,
-         "random" = results[sample(1:nrow(results), max_count), ],
-         "head"   = head(results, max_count), 
-         "tail"   = tail(results, max_count))
+  results <- switch(subsample,
+                    "random" = results[sample(1:nrow(results), max_count), ],
+                    "head"   = head(results, max_count), 
+                    "tail"   = tail(results, max_count))
   # Download sequences -----------------------------------------------------------------------------
-  sequences <- ncbi_getbyid(rownames(results), verbose=FALSE)
-  # Standardize binomial names ---------------------------------------------------------------------
-  if (standardize_name) {
-    
+  if (use_acnuc) {
+    sequences <- download_gb_query(taxon_query$req[results$index]) #seqinr used
+  } else {
+    sequences <- ncbi_getbyid(rownames(results), verbose=FALSE) #taxize used
   }
-  # Standardize taxonomy ---------------------------------------------------------------------------
-  results <- 
+  # Standardize binomial names ---------------------------------------------------------------------
+  if (standardize) {
+    gnr_result <- gnr_resolve(sequences$taxon,
+                              data_source_ids = 4, #4 is the code for NCBI
+                              stripauthority = TRUE,
+                              best_match_only = TRUE)
+    gnr_result <- gnr_result$result
+    sequences$taxon <- gnr_result$matched_name2[order(as.integer(rownames(gnr_result)))]
+  }
+  return(sequences)
 }
