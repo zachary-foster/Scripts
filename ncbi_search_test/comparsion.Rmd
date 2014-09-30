@@ -75,12 +75,11 @@ ncbi_search2 <- function(taxa = NULL, id = NULL, seqrange="1:3000", getrelated=F
 
   # Function to parse results from http query
   parseres <- function(x){
-    browser()
     outsum <- xpathApply(content(x, as="parsed"), "//eSummaryResult")[[1]]
     names <- sapply(getNodeSet(outsum[[1]], "//Item"), xmlGetAttr, name="Name") # gets names of values in summary
     predicted <- as.character(sapply(getNodeSet(outsum, "//Item"), xmlValue)[str_detect(names, "Caption")]) #  get access numbers
     has_access_prefix <- grepl("_", predicted)
-    access_prefix <- unlist(Map(function(x, y) ifelse(!x, strsplit(y, "_")[[1]][[1]], NA),
+    access_prefix <- unlist(Map(function(x, y) ifelse(x, strsplit(y, "_")[[1]][[1]], NA),
                          has_access_prefix, predicted))
     predicted[has_access_prefix] <- vapply(strsplit(predicted[has_access_prefix], "_"), `[[`, character(1), 2)
     length_ <- as.numeric(sapply(getNodeSet(outsum, "//Item"), xmlValue)[str_detect(names, "Length")]) # gets seq lengths
@@ -140,6 +139,7 @@ ncbi_search2 <- function(taxa = NULL, id = NULL, seqrange="1:3000", getrelated=F
   
   # Function to process queries one at a time
   foo <- function(xx){
+    if (is.na(xx)) return(NA)
     mssg(verbose, paste("Working on ", xx, "...", sep=""))
     mssg(verbose, "...retrieving sequence IDs...")
     esearch_result <- search_for_sequences(xx)
@@ -152,22 +152,21 @@ ncbi_search2 <- function(taxa = NULL, id = NULL, seqrange="1:3000", getrelated=F
         xx <- get_uid(parent_name)
         esearch_result <- search_for_sequences(parent_id)
       } else {
+        
         mssg(verbose, paste0("no related taxa found"))        
       }
     }
     if (as.numeric(xmlValue(xpathApply(esearch_result, "//Count")[[1]])) == 0) {
       mssg(verbose, "no sequences found")
-      return(data.frame(xx, NA, NA, NA, NA))
-    }
-    seq_ids <- xpathSApply(esearch_result, "//IdList//Id", xmlValue) # Get sequence IDs in list
-    mssg(verbose, "...retrieving available genes and their lengths...")
-    df <- download_summary(seq_ids)    
-    mssg(verbose, "...done.")
-    if(nrow(df) < 1){
-      df <- data.frame(taxon=NA,length=NA,gene_desc=NA,acc_no=NA,gi_no=NA)
+      df <- data.frame(taxon = character(0), length = numeric(0), gene_desc = character(0),
+                       acc_no = character(0), gi_no = numeric(0))
     } else {
-      names(df) <- c("taxon","length","gene_desc","acc_no","gi_no")
-    }
+      seq_ids <- xpathSApply(esearch_result, "//IdList//Id", xmlValue) # Get sequence IDs in list
+      mssg(verbose, "...retrieving available genes and their lengths...")
+      df <- download_summary(seq_ids)    
+      mssg(verbose, "...done.")
+   } 
+    names(df) <- c("taxon","length","gene_desc","acc_no","gi_no")
     return(df)
   }
   
@@ -183,6 +182,7 @@ ncbi_search2 <- function(taxa = NULL, id = NULL, seqrange="1:3000", getrelated=F
 ```{r}
 install.packages("taxize")
 library(taxize)
+library(testthat)
 environment(ncbi_search2) <- asNamespace("taxize")
 ```
 
@@ -191,10 +191,96 @@ environment(ncbi_search2) <- asNamespace("taxize")
 
 #### Single query 
 
+For a single query, both return a single data frame. Although this is convenient for people using the funtion directly, it complicates the use of the function by other functions, since the return format for multiple queries (list) is different from the return format for a single query. I preserved this behavior for backward compatibility, but I think returning a one-element list is more consistent. 
+
 ```{r}
-x <- ncbi_search(taxa = "pythium")
+query <- c("pythium")
+x <- ncbi_search(taxa = query, limit = 50)
 str(x)
-y <- ncbi_search2(taxa = "pythium")
+y <- ncbi_search2(taxa = query, limit = 50)
+str(y)
+all.equal(x, y)
+```
+
+#### Multiple queries
+
+```{r}
+query <- c("pythium", "phytophthora")
+x <- ncbi_search(taxa = query, limit = 50)
+str(x)
+y <- ncbi_search2(taxa = query, limit = 50)
+str(y)
+all.equal(x, y)
+```
+
+#### No results
+
+The two functions differ in how they handle edge cases, like no results or invalid taxon names. My version of the function returns a 0-row dataframe if no sequences are found. This allows for the results of sucessful and unsucessful searches to be `rbind`ed together without further modifications. On the other hand, an invalid search term returns `NA`, since this is something the use probably did not intend.
+
+```{r}
+query <- c("fungi", "this_is_not_valid")
+x <- ncbi_search(taxa = query, limit = 50)
+str(x)
+y <- ncbi_search2(taxa = query, limit = 50)
+str(y)
+isTRUE(all.equal(x, y))
+```
+
+An error during processing still returns `NULL` for that element, like it does in the current version of `ncbi_search`. This is a logical output, but there might be cases when a user is running a list of queries and `rbind`ing the result. In this case, the error could be overlooked, since there would be no record of it in the data. Im not sure what a better choice would be, so I left it as `NULL`.
+
+```{r}
+all.equal(rbind(NULL, data.frame(1:10)), data.frame(1:10))
+```
+
+### New functionality
+
+#### `entrez_query` option
+
+This option allows advanced users to add their own filter to the esearch query using entrez query syntax. 
+
+```{r}
+query <- c("pythium")
+x <- ncbi_search2(taxa = query, limit = 50, entrez_query = "18S[title] AND 28S[title]")
+head(x$gene_desc)
+```
+
+#### `hypothetical` option
+
+This allows users to include hypothetical/predicted genes if they want. The default to remove them, as in the built-in functionality of the current `ncbi_search`. 
+
+```{r}
+query <- c("fungi")
+x <- ncbi_search2(taxa = query, limit = 50)
+str(x)
+y <- ncbi_search2(taxa = query, limit = 50, hypothetical = TRUE)
 str(y)
 ```
 
+### Other changes
+
+#### Handling of taxon names
+
+If a taxon is supplied as a character vector via the `taxa` argument, it is converted to a ncbi taxonomy uid using `get_uid`. Instead of searching ncbi for the name, the taxa id is used. This simplifies the downstream analysis and uses `get_uid` to resolve ambiguities. 
+
+```{r}
+query <- c("Satyrium") #An ambiguous genus name
+x <- ncbi_search(taxa = query, limit = 50)
+str(x)
+y <- ncbi_search2(taxa = query, limit = 50)
+str(y)
+isTRUE(all.equal(x, y))
+```
+
+
+#### Implementation of `getrelated` option
+
+In the curent `ncbi_search` the `getrelated` option seems to work by extracting the genus name of a latin binomial name (it assumes the input is a species). I modified it to find its parent using `classification(x, db = " ncbi")`. This means that the `getrelated` option should now work at any taxonomic level. Since the `taxa` argument is converted to a uid, this change also means that the `getrelated` option will work wether an uid or a taxon name is given. 
+
+```{r}
+query <- c("Enhydrus grayii")
+x <- ncbi_search(taxa = query, limit = 50, getrelated =  TRUE)
+str(x)
+y <- ncbi_search2(taxa = query, limit = 50, getrelated =  TRUE)
+str(y)
+
+```
