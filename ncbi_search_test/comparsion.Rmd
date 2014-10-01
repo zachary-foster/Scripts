@@ -137,6 +137,18 @@ ncbi_search2 <- function(taxa = NULL, id = NULL, seqrange="1:3000", getrelated=F
     class(id) <- "uid"
   }
   
+  get_parent <- function(child) {
+      query_classification <- classification(id = xx, db = "ncbi")[[1]]
+      if (nrow(query_classification) > 1) {
+        parent_name <- query_classification$name[nrow(query_classification) - 1]
+        mssg(verbose, paste0("...retrieving sequence IDs for ", parent_name, "..."))
+        xx <- get_uid(parent_name)
+        
+      } else {  
+        mssg(verbose, paste0("no related taxa found"))        
+      }    
+  }
+  
   # Function to process queries one at a time
   foo <- function(xx){
     if (is.na(xx)) return(NA)
@@ -145,16 +157,8 @@ ncbi_search2 <- function(taxa = NULL, id = NULL, seqrange="1:3000", getrelated=F
     esearch_result <- search_for_sequences(xx)
     if (as.numeric(xmlValue(xpathApply(esearch_result, "//Count")[[1]])) == 0 && getrelated) {
       mssg(verbose, paste("no sequences for ", xx, " - getting other sp.", sep=""))
-      query_classification <- classification(id = xx, db = "ncbi")[[1]]
-      if (nrow(query_classification) > 1) {
-        parent_name <- query_classification$name[nrow(query_classification) - 1]
-        mssg(verbose, paste0("...retrieving sequence IDs for ", parent_name, "..."))
-        xx <- get_uid(parent_name)
-        esearch_result <- search_for_sequences(parent_id)
-      } else {
-        
-        mssg(verbose, paste0("no related taxa found"))        
-      }
+      parent_id <- get_parent(xx)
+      esearch_result <- search_for_sequences(parent_id)
     }
     if (as.numeric(xmlValue(xpathApply(esearch_result, "//Count")[[1]])) == 0) {
       mssg(verbose, "no sequences found")
