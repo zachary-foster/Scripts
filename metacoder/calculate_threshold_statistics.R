@@ -3,7 +3,7 @@ source("constants.R")
 
 #Parameters
 distance_matrix_file = "/home/local/USDA-ARS/fosterz/Repositories/Analysis/taxon_specific_barcode_gap/rdp_fungi_28s_1/distance_matrix_pid.txt"
-output_directory = "/home/local/USDA-ARS/fosterz/Repositories/Analysis/taxon_specific_barcode_gap/rdp_fungi_28s_1/pid"
+output_directory = "~/test"
 
 #load and format distance matrix (CAN TAKE LONG TIME)
 distance_matrix = as.matrix(read.csv(distance_matrix_file, sep="\t", row.names=1, header=FALSE))
